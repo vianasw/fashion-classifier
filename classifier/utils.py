@@ -25,6 +25,6 @@ def plot_costs(costs, title):
     plt.title(title)
     plt.show()
 
-def accuracy(predictions, labels):
+def batch_accuracy(predictions, labels):
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
             / predictions.shape[0])

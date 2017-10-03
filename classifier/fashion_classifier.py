@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, plot_costs, accuracy
+from utils import load_dataset, plot_costs
 import tensorflow as tf
 import numpy as np
 
@@ -23,21 +23,29 @@ class FashionClassifier:
             * Dense Layer #2 (Logits Layer): 10 hidden units, one for each digit target class (0–9).
 
     Arguments:
-      dataset: DataSets object as returned by tensorflow input_data.read_data_sets which contains
-        train and test datasets.
+      X_train: np array of training examples of shape [num_examples, image_size * image_size]
+      Y_train: np array of training labels of shape [num_examples, 1]
+      X_test: np array of test examples of shape [num_examples, image_size * image_size]
+      Y_test: np array of test labels of shape [num_examples, 1]
       image_size: Integer, specifies the width and height of the images from 
         the datasets.
       num_channels: Integer, number of channels of the image (1 for greyscale, 
         3 for RGB).
       num_classes: Integer, number of classes to predict.
+      log_dir: Path to save logs for Tensorboard
     """
-    def __init__(self, dataset, image_size, num_channels, num_classes):
-        self.dataset = dataset
+    def __init__(self, X_train, Y_train, X_test, Y_test, image_size, 
+            num_channels, num_classes, log_dir):
+
         self.parameters = dict()
         self.padding = 'SAME'
         self.image_size = image_size
         self.num_classes = num_classes
         self.num_channels = num_channels
+        self.X_train = X_train
+        self.Y_train = Y_train
+        self.X_test = X_test
+        self.Y_test = Y_test
         self.X = None
         self.Y = None
         self.cost = None
@@ -45,6 +53,7 @@ class FashionClassifier:
         self.logits = None
         self.batch_size = 64
         self.learning_rate = 0.001
+        self.writer = tf.summary.FileWriter(log_dir)
 
     def model(self, padding, patch_size, depth, dense_layer_units, learning_rate, batch_size, keep_prob):
         """Defines the CNN model.
@@ -64,15 +73,14 @@ class FashionClassifier:
         self.padding = padding
         self.batch_size = batch_size
         self.X, self.Y = self._create_placeholders()
-        test_dataset = self._reformat(self.dataset.test.images)
-        self.X_test = tf.constant(test_dataset)
 
         self.parameters = self._initialize_parameters(patch_size, depth, dense_layer_units)
         self.logits = self._forward_propagation(self.X, self.parameters, keep_prob, training=True)
         self.cost = self._compute_cost(self.logits, self.Y)
         self.learning_rate = learning_rate
-
-        self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
+        
+        with tf.name_scope('train'):
+            self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
 
     def train(self, num_epochs, print_cost=False):
         """Performs training for the CNN defined with the model method.
@@ -88,24 +96,28 @@ class FashionClassifier:
         costs = []
 
         train_prediction = tf.nn.softmax(self.logits)
-        test_prediction = tf.nn.softmax(self._forward_propagation(self.X_test, self.parameters))
+
+        num_examples = self.X_train.shape[0]
+        permutation = list(np.random.permutation(num_examples))
+        shuffled_X = self.X_train[permutation, :]
+        shuffled_Y = self.Y_train[permutation, :]
 
         with tf.Session() as session:
             session.run(init)
+            self.writer.add_graph(session.graph)
             
-            num_examples = self.dataset.train.num_examples
             for epoch in range(num_epochs):
                 epoch_cost = 0
                 num_minibatches = int(num_examples / self.batch_size)
-                for i in range(num_minibatches):
-                    (minibatch_X, minibatch_Y) = self.dataset.train.next_batch(self.batch_size)
+                for step in range(num_minibatches):
+                    (minibatch_X, minibatch_Y) = self._next_batch(step)
                     minibatch_X = self._reformat(minibatch_X)
                     _, minibatch_cost, predictions = session.run([self.optimizer, self.cost, train_prediction], 
                             feed_dict={self.X: minibatch_X, self.Y: minibatch_Y})
                     epoch_cost += minibatch_cost / num_minibatches
-                    if i % 50 == 0:
-                        print("Minibatch loss at step %d: %f" % (i, minibatch_cost))
-                        print("Minibatch accuracy: %.1f%%" % accuracy(predictions, minibatch_Y))
+                    if step % 50 == 0:
+                        print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
+                        print("Minibatch accuracy: %.1f%%" % batch_accuracy(predictions, minibatch_Y))
 
                 if print_cost:
                     print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
@@ -113,16 +125,13 @@ class FashionClassifier:
                 if print_cost == True and epoch % 1 == 0:
                     costs.append(epoch_cost)
 
-            if print_cost:
-                plot_costs(costs, title="Learning rate =" + str(self.learning_rate))
-
             self.parameters = session.run(self.parameters)
 
-            self._evaluate(test_prediction)
+            self._evaluate()
 
     def _create_placeholders(self):
-        X = tf.placeholder(tf.float32, [self.batch_size, self.image_size, self.image_size, self.num_channels], name='X')
-        Y = tf.placeholder(tf.float32, [self.batch_size, self.num_classes], name='Y')
+        X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, self.num_channels], name='X')
+        Y = tf.placeholder(tf.float32, [None, self.num_classes], name='Y')
         return X, Y
 
     def _initialize_parameters(self, patch_size, depth, dense_layer_units):
@@ -179,7 +188,7 @@ class FashionClassifier:
             training.
 
         Returns:
-          Z4: The output of the last linear unit
+          fc2: The output of the last linear unit
         """
 
         W1 = parameters['W1']
@@ -190,45 +199,73 @@ class FashionClassifier:
         b3 = parameters['b3']
         W4 = parameters['W4']
         b4 = parameters['b4']
+       
+        conv1 = self._conv_layer(X, W1, b1, conv_stride=1, name='conv1')
+        conv2 = self._conv_layer(conv1, W2, b2, conv_stride=2, name='conv2')
+        
+        shape = conv2.get_shape().as_list()
+        flattened = tf.reshape(conv2, [-1, shape[1] * shape[2] * shape[3]]) 
+        fc1 = self._fully_connected_layer(flattened, W3, b3, name='fc1')
+        fc1_dropout = self._dropout(fc1, keep_prob, training)
+        fc2 = self._fully_connected_layer(fc1_dropout, W4, b4, name='fc2')
+        return fc2
 
-        Z1 = tf.nn.conv2d(X, W1, [1, 1, 1, 1], padding=self.padding) + b1
-        A1 = tf.nn.relu(Z1)
-        M1 = tf.nn.max_pool(A1, [1, 2, 2, 1], [1, 2, 2, 1], padding=self.padding)
+    def _conv_layer(self, X, W, b, conv_stride, name='conv'):
+        with tf.name_scope(name):
+            conv = tf.nn.conv2d(X, W, strides=[1, conv_stride, conv_stride, 1], padding=self.padding)
+            act = tf.nn.relu(conv + b)
+            pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=self.padding)
+            return pool
 
-        Z2 = tf.nn.conv2d(M1, W2, [1, 2, 2, 1], padding=self.padding) + b2
-        A2 = tf.nn.relu(Z2)
-        M2 = tf.nn.max_pool(A2, [1, 2, 2, 1], [1, 2, 2, 1], padding=self.padding)
+    def _fully_connected_layer(self, X, W, b, name='fc'):
+        with tf.name_scope(name):
+            act = tf.matmul(X, W) + b
+            return act
 
-        shape = M2.get_shape().as_list()
-        M2_flatten = tf.reshape(M2, [shape[0], shape[1] * shape[2] * shape[3]])
-        Z3 = tf.matmul(M2_flatten, W3) + b3
-        A3 = tf.nn.relu(Z3)
+    def _dropout(self, X, keep_prob, training=False, name='dropout'):
+        with tf.name_scope(name):
+            if training:
+                keep_prob = tf.constant(keep_prob)
+            else:
+                keep_prob = tf.constant(1.0)
 
-        if training:
-            keep_prob = tf.constant(keep_prob)
-        else:
-            keep_prob = tf.constant(1.0)
-
-        A3_dropout = tf.nn.dropout(A3, keep_prob)
-
-        Z4 = tf.matmul(A3_dropout, W4) + b4
-        return Z4
+            return tf.nn.dropout(X, keep_prob)
 
     def _compute_cost(self, logits, labels):
-        return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
+        with tf.name_scope('xent'):
+            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
+        return cost
 
     def _reformat(self, dataset):
         return dataset.reshape([-1, self.image_size, self.image_size, self.num_channels])
     
-    def _evaluate(self, test_prediction):
-        print ("Test Accuracy: %.1f%%" % accuracy(test_prediction.eval(), self.dataset.test.labels))
+    def _evaluate(self):
+        with tf.name_scope('accuracy'):
+            correct_prediction = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            print ("Train Accuracy:", accuracy.eval({self.X: self._reformat(self.X_train), self.Y: self.Y_train}))
+            print ("Test Accuracy:", accuracy.eval({self.X: self._reformat(self.X_test), self.Y: self.Y_test}))
+
+    def _next_batch(self, step):
+        offset = (step * self.batch_size) % (self.X_train.shape[0] - self.batch_size)
+        minibatch_X = self.X_train[offset:(offset + self.batch_size), :]
+        minibatch_Y = self.Y_train[offset:(offset + self.batch_size), :]
+        return minibatch_X, minibatch_Y
+
 
 def main(_):
     dataset = load_dataset()
-    fashion_classiffier = FashionClassifier(dataset, image_size=28, num_channels=1, num_classes=10)
-    fashion_classiffier.model(padding='SAME', patch_size=5, depth=20, dense_layer_units=500, 
-            learning_rate=0.001, batch_size=128, keep_prob=0.5)
-    fashion_classiffier.train(num_epochs=5, print_cost=True)
+    X_train, Y_train = dataset.train.images, dataset.train.labels
+    X_test, Y_test = dataset.test.images, dataset.test.labels
+
+    fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test, 
+            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/1')
+
+    fashion_classiffier.model(padding='SAME', patch_size=5, depth=20, 
+            dense_layer_units=500, learning_rate=0.001, batch_size=128, 
+            keep_prob=0.5)
+
+    fashion_classiffier.train(num_epochs=1, print_cost=True)
 
 if __name__ == '__main__':
     tf.app.run(main=main, argv=[]) 
