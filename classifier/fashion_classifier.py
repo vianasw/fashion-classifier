@@ -37,7 +37,6 @@ class FashionClassifier:
     def __init__(self, X_train, Y_train, X_test, Y_test, image_size, 
             num_channels, num_classes, log_dir):
 
-        self.parameters = dict()
         self.padding = 'SAME'
         self.image_size = image_size
         self.num_classes = num_classes
@@ -72,13 +71,17 @@ class FashionClassifier:
 
         self.padding = padding
         self.batch_size = batch_size
+        self.patch_size = patch_size
+        self.depth = depth
+        self.dense_layer_units = dense_layer_units
+        self.learning_rate = learning_rate
+
         self.X, self.Y = self._create_placeholders()
         tf.summary.image('input', self.X, 3)
 
-        self.parameters = self._initialize_parameters(patch_size, depth, dense_layer_units)
-        self.logits = self._forward_propagation(self.X, self.parameters, keep_prob, training=True)
+        self.logits = self._forward_propagation(self.X, keep_prob, training=True)
         self.cost = self._compute_cost(self.logits, self.Y)
-        self.learning_rate = learning_rate
+ 
         
         with tf.name_scope('train'):
             self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
@@ -138,8 +141,6 @@ class FashionClassifier:
                 if print_cost == True and epoch % 1 == 0:
                     costs.append(epoch_cost)
 
-            self.parameters = session.run(self.parameters)
-
             self._evaluate()
 
     def _create_placeholders(self):
@@ -147,49 +148,7 @@ class FashionClassifier:
         Y = tf.placeholder(tf.float32, [None, self.num_classes], name='Y')
         return X, Y
 
-    def _initialize_parameters(self, patch_size, depth, dense_layer_units):
-        """ Initializes weights and biases parameters.
-        
-        Weights are initialized with Xavier initialization, biases with zeros.
-
-        Arguments:
-          patch_size: Integer, convolution patch size.
-          depth: Integer, depth of first conv layer.
-          dense_layer_units: Integer, number of hidden units in the dense 
-            layer.
-
-        Returns:
-          parameters: Dictionary containing initialized weights and biases.
-        """
-        W1 = tf.get_variable('W1', [patch_size, patch_size, self.num_channels, depth], 
-            initializer=tf.contrib.layers.xavier_initializer())
-        b1 = tf.get_variable('b1', [depth], initializer=tf.zeros_initializer())
-
-        W2 = tf.get_variable('W2', [patch_size, patch_size, depth, 50], 
-            initializer=tf.contrib.layers.xavier_initializer())
-        b2 = tf.get_variable('b2', [50], initializer=tf.zeros_initializer())
-
-        W3 = tf.get_variable('W3', [4 * 4 * 50, dense_layer_units], 
-            initializer=tf.contrib.layers.xavier_initializer())
-        b3 = tf.get_variable('b3', [dense_layer_units], initializer=tf.zeros_initializer())
-
-        W4 = tf.get_variable('W4', [dense_layer_units, self.num_classes], 
-            initializer=tf.contrib.layers.xavier_initializer())
-        b4 = tf.get_variable('b4', [self.num_classes], initializer=tf.zeros_initializer())
-            
-        parameters = dict()
-        parameters['W1'] = W1
-        parameters['b1'] = b1
-        parameters['W2'] = W2
-        parameters['b2'] = b2
-        parameters['W3'] = W3
-        parameters['b3'] = b3
-        parameters['W4'] = W4
-        parameters['b4'] = b4
-
-        return parameters
-
-    def _forward_propagation(self, X, parameters, keep_prob=1.0, training=False):
+    def _forward_propagation(self, X, keep_prob=1.0, training=False):
         """Defines feed forward computation graph.
         
         Arguments:
@@ -203,36 +162,46 @@ class FashionClassifier:
         Returns:
           fc2: The output of the last linear unit
         """
+      
+        conv1 = self._conv_layer(input=X, size_in=self.num_channels, 
+                size_out=self.depth, patch_size=self.patch_size, conv_stride=1, 
+                name='conv1')
 
-        W1 = parameters['W1']
-        b1 = parameters['b1']
-        W2 = parameters['W2']
-        b2 = parameters['b2']
-        W3 = parameters['W3']
-        b3 = parameters['b3']
-        W4 = parameters['W4']
-        b4 = parameters['b4']
-       
-        conv1 = self._conv_layer(X, W1, b1, conv_stride=1, name='conv1')
-        conv2 = self._conv_layer(conv1, W2, b2, conv_stride=2, name='conv2')
+        conv2 = self._conv_layer(input=conv1, size_in=self.depth, size_out=50, 
+                patch_size=self.patch_size, conv_stride=2, name='conv2')
         
         shape = conv2.get_shape().as_list()
         flattened = tf.reshape(conv2, [-1, shape[1] * shape[2] * shape[3]]) 
-        fc1 = self._fully_connected_layer(flattened, W3, b3, name='fc1')
+        
+        fc1 = self._fully_connected_layer(flattened, size_in=4*4*50, 
+                size_out=self.dense_layer_units, name='fc1')
+
         fc1_dropout = self._dropout(fc1, keep_prob, training)
-        fc2 = self._fully_connected_layer(fc1_dropout, W4, b4, name='fc2')
+        
+        fc2 = self._fully_connected_layer(fc1_dropout, 
+                size_in=self.dense_layer_units, 
+                size_out=self.num_classes, name='fc2')
         return fc2
 
-    def _conv_layer(self, X, W, b, conv_stride, name='conv'):
-        with tf.name_scope(name):
-            conv = tf.nn.conv2d(X, W, strides=[1, conv_stride, conv_stride, 1], padding=self.padding)
+    def _conv_layer(self, input, size_in, size_out, patch_size, conv_stride, name='conv'):
+        with tf.variable_scope(name):
+            W = tf.get_variable('W', [patch_size, patch_size, size_in, size_out], 
+                initializer=tf.contrib.layers.xavier_initializer())
+            b = tf.get_variable('b', [size_out], initializer=tf.zeros_initializer())
+
+            conv = tf.nn.conv2d(input, W, strides=[1, conv_stride, conv_stride, 1], padding=self.padding)
             act = tf.nn.relu(conv + b)
             pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=self.padding)
             return pool
 
-    def _fully_connected_layer(self, X, W, b, name='fc'):
-        with tf.name_scope(name):
-            act = tf.matmul(X, W) + b
+    def _fully_connected_layer(self, input, size_in, size_out, name='fc'):
+        with tf.variable_scope(name):
+            W = tf.get_variable('W', [size_in, size_out], 
+                    initializer=tf.contrib.layers.xavier_initializer())
+            b = tf.get_variable('b', [size_out], 
+                    initializer=tf.zeros_initializer())
+
+            act = tf.matmul(input, W) + b
             return act
 
     def _dropout(self, X, keep_prob, training=False, name='dropout'):
@@ -273,7 +242,7 @@ def main(_):
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test, 
-            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/4')
+            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/6')
 
     fashion_classiffier.model(padding='SAME', patch_size=5, depth=20, 
             dense_layer_units=500, learning_rate=0.001, batch_size=128, 
