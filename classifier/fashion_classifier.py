@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, plot_costs
+from utils import load_dataset, plot_costs, batch_accuracy
 import tensorflow as tf
 import numpy as np
 
@@ -73,6 +73,7 @@ class FashionClassifier:
         self.padding = padding
         self.batch_size = batch_size
         self.X, self.Y = self._create_placeholders()
+        tf.summary.image('input', self.X, 3)
 
         self.parameters = self._initialize_parameters(patch_size, depth, dense_layer_units)
         self.logits = self._forward_propagation(self.X, self.parameters, keep_prob, training=True)
@@ -81,6 +82,7 @@ class FashionClassifier:
         
         with tf.name_scope('train'):
             self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
+
 
     def train(self, num_epochs, print_cost=False):
         """Performs training for the CNN defined with the model method.
@@ -102,6 +104,13 @@ class FashionClassifier:
         shuffled_X = self.X_train[permutation, :]
         shuffled_Y = self.Y_train[permutation, :]
 
+        with tf.name_scope('batch_accuracy'):
+            correct_prediction = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            tf.summary.scalar('batch_accuracy', accuracy)
+
+        summ = tf.summary.merge_all()
+
         with tf.Session() as session:
             session.run(init)
             self.writer.add_graph(session.graph)
@@ -118,6 +127,10 @@ class FashionClassifier:
                     if step % 50 == 0:
                         print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
                         print("Minibatch accuracy: %.1f%%" % batch_accuracy(predictions, minibatch_Y))
+
+                    if step % 5 == 0:
+                        [b, s] = session.run([accuracy, summ], feed_dict={self.X: minibatch_X, self.Y: minibatch_Y})
+                        self.writer.add_summary(s, (epoch * num_minibatches) + step)
 
                 if print_cost:
                     print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
@@ -163,7 +176,7 @@ class FashionClassifier:
         W4 = tf.get_variable('W4', [dense_layer_units, self.num_classes], 
             initializer=tf.contrib.layers.xavier_initializer())
         b4 = tf.get_variable('b4', [self.num_classes], initializer=tf.zeros_initializer())
-        
+            
         parameters = dict()
         parameters['W1'] = W1
         parameters['b1'] = b1
@@ -234,6 +247,7 @@ class FashionClassifier:
     def _compute_cost(self, logits, labels):
         with tf.name_scope('xent'):
             cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
+            tf.summary.scalar("cost", cost)
         return cost
 
     def _reformat(self, dataset):
@@ -259,13 +273,13 @@ def main(_):
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test, 
-            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/1')
+            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/4')
 
     fashion_classiffier.model(padding='SAME', patch_size=5, depth=20, 
             dense_layer_units=500, learning_rate=0.001, batch_size=128, 
             keep_prob=0.5)
 
-    fashion_classiffier.train(num_epochs=1, print_cost=True)
+    fashion_classiffier.train(num_epochs=10, print_cost=True)
 
 if __name__ == '__main__':
     tf.app.run(main=main, argv=[]) 
