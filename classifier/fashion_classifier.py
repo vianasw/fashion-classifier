@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, plot_costs, batch_accuracy
+from utils import load_dataset, plot_costs
 import tensorflow as tf
 import numpy as np
 
@@ -61,6 +61,7 @@ class FashionClassifier:
 
         Arguments:
           padding: String, convolution padding ('SAME' or 'VALID').
+          patch_size: Integer, patch size to apply in conv layers
           depth: Integer, depth of the first convolution layer.
           dense_layer_units: Integer, number of hidden units in the dense layer.
           learning_rate: Float, learning rate hyperparameter.
@@ -82,7 +83,6 @@ class FashionClassifier:
         self.logits = self._forward_propagation(self.X, keep_prob, training=True)
         self.cost = self._compute_cost(self.logits, self.Y)
  
-        
         with tf.name_scope('train'):
             self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(self.cost)
 
@@ -90,28 +90,19 @@ class FashionClassifier:
     def train(self, num_epochs, print_cost=False):
         """Performs training for the CNN defined with the model method.
         
-        Peforms mini-batch gradient descent.
-
         Arguments:
           num_epochs: Integer, number of epochs to perform training.
           print_cost: Boolean, if True, prints costs every X iterations.
         """
 
         init = tf.global_variables_initializer()
-        costs = []
 
         train_prediction = tf.nn.softmax(self.logits)
 
         num_examples = self.X_train.shape[0]
-        permutation = list(np.random.permutation(num_examples))
-        shuffled_X = self.X_train[permutation, :]
-        shuffled_Y = self.Y_train[permutation, :]
+        shuffled_X, shuffled_Y = self._shuffle_training_set()
 
-        with tf.name_scope('batch_accuracy'):
-            correct_prediction = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
-            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            tf.summary.scalar('batch_accuracy', accuracy)
-
+        accuracy = self._accuracy()
         summ = tf.summary.merge_all()
 
         with tf.Session() as session:
@@ -124,22 +115,21 @@ class FashionClassifier:
                 for step in range(num_minibatches):
                     (minibatch_X, minibatch_Y) = self._next_batch(step)
                     minibatch_X = self._reformat(minibatch_X)
+
                     _, minibatch_cost, predictions = session.run([self.optimizer, self.cost, train_prediction], 
                             feed_dict={self.X: minibatch_X, self.Y: minibatch_Y})
-                    epoch_cost += minibatch_cost / num_minibatches
-                    if step % 50 == 0:
-                        print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
-                        print("Minibatch accuracy: %.1f%%" % batch_accuracy(predictions, minibatch_Y))
 
+                    epoch_cost += minibatch_cost / num_minibatches
+                    
                     if step % 5 == 0:
-                        [b, s] = session.run([accuracy, summ], feed_dict={self.X: minibatch_X, self.Y: minibatch_Y})
+                        [batch_accuracy, s] = session.run([accuracy, summ], feed_dict={self.X: minibatch_X, self.Y: minibatch_Y})
                         self.writer.add_summary(s, (epoch * num_minibatches) + step)
+                        if print_cost and step % 50 == 0:
+                            print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
+                            print("Minibatch accuracy: %.1f%%" % (batch_accuracy * 100))
 
                 if print_cost:
                     print ("Cost after epoch %i: %f" % (epoch, epoch_cost))
-
-                if print_cost == True and epoch % 1 == 0:
-                    costs.append(epoch_cost)
 
             self._evaluate()
 
@@ -181,6 +171,7 @@ class FashionClassifier:
         fc2 = self._fully_connected_layer(fc1_dropout, 
                 size_in=self.dense_layer_units, 
                 size_out=self.num_classes, name='fc2')
+
         return fc2
 
     def _conv_layer(self, input, size_in, size_out, patch_size, conv_stride, name='conv'):
@@ -244,6 +235,18 @@ class FashionClassifier:
         minibatch_Y = self.Y_train[offset:(offset + self.batch_size), :]
         return minibatch_X, minibatch_Y
 
+    def _shuffle_training_set(self):
+        num_examples = self.X_train.shape[0]
+        permutation = list(np.random.permutation(num_examples))
+        return (self.X_train[permutation, :], self.Y_train[permutation, :])
+    
+    def _accuracy(self):
+        with tf.name_scope('accuracy'):
+            correct_prediction = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
+            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            tf.summary.scalar('accuracy', accuracy)
+            return accuracy
+
 
 def main(_):
     dataset = load_dataset()
@@ -251,13 +254,13 @@ def main(_):
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test, 
-            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/6')
+            image_size=28, num_channels=1, num_classes=10, log_dir='/tmp/fashion-classifier/7')
 
     fashion_classiffier.model(padding='SAME', patch_size=5, depth=20, 
             dense_layer_units=500, learning_rate=0.001, batch_size=128, 
             keep_prob=0.5)
 
-    fashion_classiffier.train(num_epochs=10, print_cost=True)
+    fashion_classiffier.train(num_epochs=1, print_cost=True)
 
 if __name__ == '__main__':
     tf.app.run(main=main, argv=[]) 
