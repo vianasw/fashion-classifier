@@ -102,3 +102,6 @@ ENV/
 
 # dataset
 classifier/data
+
+# vim swap files
+*.swp
