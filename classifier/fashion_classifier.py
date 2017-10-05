@@ -192,6 +192,10 @@ class FashionClassifier:
             conv = tf.nn.conv2d(input, W, strides=[1, conv_stride, conv_stride, 1], padding=self.padding)
             act = tf.nn.relu(conv + b)
             pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=self.padding)
+
+            tf.summary.histogram("weights", W)
+            tf.summary.histogram("biases", b)
+            tf.summary.histogram("activations", act)
             return pool
 
     def _fully_connected_layer(self, input, size_in, size_out, name='fc'):
@@ -202,6 +206,11 @@ class FashionClassifier:
                     initializer=tf.zeros_initializer())
 
             act = tf.matmul(input, W) + b
+
+            tf.summary.histogram("weights", W)
+            tf.summary.histogram("biases", b)
+            tf.summary.histogram("activations", act)
+
             return act
 
     def _dropout(self, X, keep_prob, training=False, name='dropout'):
