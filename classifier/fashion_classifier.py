@@ -1,10 +1,15 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, plot_costs
+from utils import load_dataset, get_hparams
+import argparse
 import tensorflow as tf
 import numpy as np
 import os
+import sys
 
+
+FLAGS = None
+DEFAULT_LOGDIR = '/tmp/fashion-classifier/logdir/'
 
 class FashionClassifier:
     """Classifier for the Fashion-MNIST Zalando's dataset [1].
@@ -346,31 +351,59 @@ class FashionClassifier:
     def _save_checkpoint(self, session, saver, step):
         session.run(tf.assign(self.current_step, step))
         if step % 50 == 0:
-            saver.save(session, os.path.join(self.train_dir, 'model.ckpt'),
-                       global_step=self.global_step)
+            checkpoint_path = os.path.join(self.log_dir,
+                                           self.checkpoint_filename)
+
+            saver.save(session, checkpoint_path, global_step=self.global_step)
 
     def _restore_last_checkpoint(self, session, saver):
-        assert tf.gfile.Exists(os.path.join(self.train_dir, 'checkpoint'))
-        ckpt = tf.train.get_checkpoint_state(self.train_dir)
+        assert tf.gfile.Exists(os.path.join(self.log_dir, 'checkpoint'))
+        ckpt = tf.train.get_checkpoint_state(self.log_dir)
         saver.restore(session, ckpt.model_checkpoint_path)
-
 
 def main(_):
     dataset = load_dataset()
     X_train, Y_train = dataset.train.images, dataset.train.labels
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
+    if FLAGS.logdir:
+        log_dir = FLAGS.logdir
+    else:
+        log_dir = DEFAULT_LOGDIR
+
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test,
                                             image_size=28, num_channels=1,
                                             num_classes=10,
-                                            train_dir='/tmp/fashion-classifier/7')
+                                            log_dir=log_dir)
 
-    fashion_classiffier.model(padding='SAME', patch_size=5, depth=20,
-                              dense_layer_units=500, learning_rate=0.001,
-                              batch_size=128, keep_prob=0.5)
+    hparams = get_hparams(FLAGS.hparams)
+    fashion_classiffier.model(padding='SAME', patch_size=5,
+                              conv_depths=[hparams.conv1_depth, hparams.conv2_depth],
+                              dense_layer_units=hparams.dense_layer_units,
+                              learning_rate=hparams.learning_rate,
+                              batch_size=hparams.batch_size,
+                              keep_prob=hparams.keep_prob)
 
-    fashion_classiffier.train(num_epochs=4, resume_training=True,
-                              print_cost=True)
+    if FLAGS.action == 'train':
+        resume_training = True if FLAGS.resume_training else False
+        fashion_classiffier.train_and_evaluate(num_epochs=hparams.num_epochs,
+                                               resume_training=FLAGS.resume_training,
+                                               print_cost=True)
+    else:
+        fashion_classiffier.load_and_evaluate()
+
 
 if __name__ == '__main__':
-    tf.app.run(main=main, argv=[])
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('action', choices=['train', 'load'], default=None)
+    parser.add_argument('--logdir', type=str, default=None,
+                        help='Store log/model files.')
+    parser.add_argument('--resume_training',
+                        help='Resume training by loading last checkpoint')
+    parser.add_argument('--hparams', type=str, default=None,
+                        help='Comma separated list of "name=value" pairs.')
+
+    FLAGS, _ = parser.parse_known_args()
+
+    tf.app.run(main=main, argv=[sys.argv[0]])
