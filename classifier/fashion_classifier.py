@@ -140,7 +140,6 @@ class FashionClassifier:
                 epoch_cost = 0
                 for step in range(current_step, num_minibatches):
                     (minibatch_X, minibatch_Y) = self._next_batch(step)
-                    minibatch_X = self._reformat(minibatch_X)
 
                     _, minibatch_cost, predictions = session.run(
                             [self.optimizer, self.cost, train_prediction],
@@ -157,6 +156,18 @@ class FashionClassifier:
 
                     self._save_checkpoint(session, saver, step)
                 current_step = 0
+
+                # Handling the end case (last mini-batch < batch_size)
+                if num_examples % num_minibatches != 0:
+                    (minibatch_X, minibatch_Y) = self._last_batch(num_minibatches)
+                    _, minibatch_cost, predictions = session.run(
+                            [self.optimizer, self.cost, train_prediction],
+                            feed_dict={self.X: minibatch_X,
+                                       self.Y: minibatch_Y}
+                        )
+
+                    epoch_cost += minibatch_cost / num_minibatches
+
                 if print_cost:
                     print("Cost after epoch %i: %f" % (epoch, epoch_cost))
 
@@ -284,6 +295,14 @@ class FashionClassifier:
                                              self.batch_size)
         minibatch_X = self.X_train[offset:(offset + self.batch_size), :]
         minibatch_Y = self.Y_train[offset:(offset + self.batch_size), :]
+        minibatch_X = self._reformat(minibatch_X)
+        return minibatch_X, minibatch_Y
+    
+    def _last_batch(self, num_minibatches):
+        offset = num_minibatches * self.batch_size
+        minibatch_X = self.X_train[offset:, :]
+        minibatch_Y = self.Y_train[offset:, :]
+        minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
 
     def _shuffle_training_set(self):
