@@ -40,10 +40,11 @@ class FashionClassifier:
         num_channels: Integer, number of channels of the image (1 for
             greyscale, 3 for RGB).
         num_classes: Integer, number of classes to predict.
-        train_dir: Path to save logs for Tensorboard and checkpoint files
+        log_dir: Path to save logs for Tensorboard and checkpoint files
     """
     def __init__(self, X_train, Y_train, X_test, Y_test, image_size,
-                 num_channels, num_classes, train_dir):
+                 num_channels, num_classes, log_dir,
+                 checkpoint_filename='model.ckpt'):
 
         self.padding = 'SAME'
         self.image_size = image_size
@@ -59,11 +60,11 @@ class FashionClassifier:
         self.optimizer = None
         self.logits = None
         self.batch_size = 64
-        self.learning_rate = 0.001
-        self.writer = tf.summary.FileWriter(train_dir)
-        self.train_dir = train_dir
+        self.writer = tf.summary.FileWriter(log_dir)
+        self.log_dir = log_dir
+        self.checkpoint_filename = checkpoint_filename
 
-    def model(self, padding, patch_size, depth, dense_layer_units,
+    def model(self, padding, patch_size, conv_depths, dense_layer_units,
               learning_rate, batch_size, keep_prob):
         """Defines the CNN model.
 
@@ -72,24 +73,28 @@ class FashionClassifier:
         Arguments:
             padding: String, convolution padding ('SAME' or 'VALID').
             patch_size: Integer, patch size to apply in conv layers
-            depth: Integer, depth of the first convolution layer.
+            conv_depths: Array of integers with the depths of the convolution
+                layers.
             dense_layer_units: Integer, number of hidden units in the dense
                 layer.
-            learning_rate: Float, learning rate hyperparameter.
+            learning_rate: Float, starter learning rate hyperparameter
+                for learning rate decay.
             batch_size: Integer, size of the batch to process in each training
                 step.
             keep_prob: Float, dropout keep probability (from 0.0 to 1.0) to
                 apply during training.
         """
 
+        tf.reset_default_graph()
+
         self.padding = padding
         self.batch_size = batch_size
         self.patch_size = patch_size
-        self.depth = depth
+        self.conv_depths = conv_depths
         self.dense_layer_units = dense_layer_units
-        self.learning_rate = learning_rate
 
         self.X, self.Y = self._create_placeholders()
+        # this is to display some image examples on Tensorboard
         tf.summary.image('input', self.X, 3)
 
         self.logits = self._forward_propagation(
@@ -105,14 +110,15 @@ class FashionClassifier:
             self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(
                     self.cost, global_step=self.global_step)
 
-    def train(self, num_epochs, resume_training=False, print_cost=False):
+    def train_and_evaluate(self, num_epochs, resume_training=False,
+                           print_cost=False):
         """Performs training for the CNN defined with the model method.
 
         Arguments:
             num_epochs: Integer, number of epochs to perform training.
             resume_training: Boolean, if True restores tensor values from
             checkpoint.
-            print_cost: Boolean, if True, prints costs every X iterations.
+            print_cost: Boolean, if True, prints costs every some iterations.
         """
         init = tf.global_variables_initializer()
 
@@ -173,6 +179,14 @@ class FashionClassifier:
 
             self._evaluate()
 
+    def load_and_evaluate(self):
+        init = tf.global_variables_initializer()
+        with tf.Session() as session:
+            session.run(init)
+            saver = tf.train.Saver()
+            self._restore_last_checkpoint(session, saver)
+            self._evaluate()
+
     def _create_placeholders(self):
         X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size,
                            self.num_channels], name='X')
@@ -196,18 +210,19 @@ class FashionClassifier:
         """
 
         conv1 = self._conv_layer(input=X, size_in=self.num_channels,
-                                 size_out=self.depth,
+                                 size_out=self.conv_depths[0],
                                  patch_size=self.patch_size, conv_stride=1,
                                  name='conv1')
 
-        conv2 = self._conv_layer(input=conv1, size_in=self.depth, size_out=50,
-                                 patch_size=self.patch_size, conv_stride=2,
-                                 name='conv2')
+        conv2 = self._conv_layer(input=conv1, size_in=self.conv_depths[0],
+                                 size_out=self.conv_depths[1],
+                                 patch_size=self.patch_size,
+                                 conv_stride=2, name='conv2')
 
         shape = conv2.get_shape().as_list()
-        flattened = tf.reshape(conv2, [-1, shape[1] * shape[2] * shape[3]])
-
-        fc1 = self._fully_connected_layer(flattened, size_in=4*4*50,
+        fc1_size_in = shape[1] * shape[2] * shape[3]
+        flattened = tf.reshape(conv2, [-1, fc1_size_in])
+        fc1 = self._fully_connected_layer(flattened, size_in=fc1_size_in,
                                           size_out=self.dense_layer_units,
                                           name='fc1')
 
@@ -282,9 +297,7 @@ class FashionClassifier:
 
     def _evaluate(self):
         with tf.name_scope('accuracy'):
-            correct_prediction = tf.equal(tf.argmax(self.logits, 1),
-                                          tf.argmax(self.Y, 1))
-            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            accuracy = self._accuracy()
             print("Train Accuracy:", accuracy.eval(
                 {self.X: self._reformat(self.X_train), self.Y: self.Y_train}))
             print("Test Accuracy:", accuracy.eval(
@@ -297,7 +310,7 @@ class FashionClassifier:
         minibatch_Y = self.Y_train[offset:(offset + self.batch_size), :]
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
-    
+
     def _last_batch(self, num_minibatches):
         offset = num_minibatches * self.batch_size
         minibatch_X = self.X_train[offset:, :]
