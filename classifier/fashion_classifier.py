@@ -185,6 +185,8 @@ class FashionClassifier:
             self._evaluate()
 
     def load_and_evaluate(self):
+        """Loads model from last checkpoint stored in log_dir.
+        """
         init = tf.global_variables_initializer()
         with tf.Session() as session:
             session.run(init)
