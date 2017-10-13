@@ -40,7 +40,7 @@ def main(_):
 
     hparams_subset = hparam_product(param_grid)
     shuffle(hparams_subset)
-    grid_size = min(len(hparams_subset) - 1, FLAGS.grid_size)
+    grid_size = min(len(hparams_subset), FLAGS.grid_size)
     hparams_subset = hparams_subset[:grid_size]
 
     for hparams in hparams_subset:
