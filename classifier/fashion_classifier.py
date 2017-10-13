@@ -126,13 +126,14 @@ class FashionClassifier:
             print_cost: Boolean, if True, prints costs every some iterations.
         """
         init = tf.global_variables_initializer()
-
-        train_prediction = tf.nn.softmax(self.logits)
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
+                                                training=False)
+        train_prediction = tf.nn.softmax(eval_logits)
+        accuracy = self._accuracy(eval_logits)
 
         num_examples = self.X_train.shape[0]
         shuffled_X, shuffled_Y = self._shuffle_training_set()
 
-        accuracy = self._accuracy()
         summ_op = tf.summary.merge_all()
 
         with tf.Session() as session:
@@ -182,17 +183,20 @@ class FashionClassifier:
                 if print_cost:
                     print("Cost after epoch %i: %f" % (epoch, epoch_cost))
 
-            self._evaluate()
+            self._evaluate(eval_logits)
 
     def load_and_evaluate(self):
         """Loads model from last checkpoint stored in log_dir.
         """
         init = tf.global_variables_initializer()
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
+                                                training=False)
+
         with tf.Session() as session:
             session.run(init)
             saver = tf.train.Saver()
             self._restore_last_checkpoint(session, saver)
-            self._evaluate()
+            self._evaluate(eval_logits)
 
     def _create_placeholders(self):
         X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size,
@@ -244,7 +248,7 @@ class FashionClassifier:
 
     def _conv_layer(self, input, size_in, size_out, patch_size, conv_stride,
                     name='conv'):
-        with tf.variable_scope(name):
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
             W = tf.get_variable(
                     'W',
                     [patch_size, patch_size, size_in, size_out],
@@ -267,7 +271,7 @@ class FashionClassifier:
             return pool
 
     def _fully_connected_layer(self, input, size_in, size_out, name='fc'):
-        with tf.variable_scope(name):
+        with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
             W = tf.get_variable(
                     'W', [size_in, size_out],
                     initializer=tf.contrib.layers.xavier_initializer())
@@ -302,9 +306,9 @@ class FashionClassifier:
         return dataset.reshape([-1, self.image_size, self.image_size,
                                self.num_channels])
 
-    def _evaluate(self):
+    def _evaluate(self, logits):
         with tf.name_scope('accuracy'):
-            accuracy = self._accuracy()
+            accuracy = self._accuracy(logits)
             print("Train Accuracy:", accuracy.eval(
                 {self.X: self._reformat(self.X_train), self.Y: self.Y_train}))
             print("Test Accuracy:", accuracy.eval(
@@ -330,9 +334,9 @@ class FashionClassifier:
         permutation = list(np.random.permutation(num_examples))
         return (self.X_train[permutation, :], self.Y_train[permutation, :])
 
-    def _accuracy(self):
+    def _accuracy(self, logits):
         with tf.name_scope('accuracy'):
-            correct_prediction = tf.equal(tf.argmax(self.logits, 1),
+            correct_prediction = tf.equal(tf.argmax(logits, 1),
                                           tf.argmax(self.Y, 1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             tf.summary.scalar('accuracy', accuracy)
