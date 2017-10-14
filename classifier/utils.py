@@ -9,15 +9,29 @@ DATASET_PATH = 'data/fashion'
 IMAGE_SIZE = 28
 
 def load_dataset():
+    """Loads fashion dataset
+
+    Returns:
+        Datasets object
+    """
     data = input_data.read_data_sets(DATASET_PATH, one_hot=True)
     return data
 
-def get_hparams(hparams_arg):
+def get_hparams(hparams_str):
+    """Parses hparams_str to HParams object.
+
+    Arguments:
+        hparams_str: String of comma separated param=value pairs.
+
+    Returns:
+        hparams: tf.contrib.training.HParams object from hparams_str. If
+            hparams_str is None, then a default HParams object is returned.
+    """
     hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32, conv2_depth=128,
-                                          dense_layer_units=1024, batch_size=128, 
+                                          dense_layer_units=1024, batch_size=128,
                                           keep_prob=0.5, num_epochs=1)
-    if hparams_arg:
-        hparams.parse(hparams_arg)
+    if hparams_str:
+        hparams.parse(hparams_str)
     return hparams
 
 def show_image(image, width, height):
@@ -28,10 +42,10 @@ def show_image(image, width, height):
 def augment_data(images, labels, width, height, num_channels, percent):
     """Augment dataset by applying rando horizontal flip and random crop to
     a percentage of images.
-    
+
     Arguments:
-        images: Array of images with shape [batch_size, 
-            width * height * num_channels] 
+        images: Array of images with shape [batch_size,
+            width * height * num_channels]
         labels: Array of labels with shape [batch_size]
         width: Int, width of the images.
         height: Int, height of the images.
@@ -62,8 +76,8 @@ def random_flip_left_right(images, labels, width, height, num_channels, percent)
     """Randomly flips images horizontally.
 
     Arguments:
-        images: Array of images with shape [batch_size, 
-            width * height * num_channels] 
+        images: Array of images with shape [batch_size,
+            width * height * num_channels]
         labels: Array of labels with shape [batch_size]
         width: Int, width of the images.
         height: Int, height of the images.
@@ -86,8 +100,8 @@ def random_crop(images, labels, width, height, num_channels, percent):
     """Randomly crops images with a 20x20 bounding box and resize them to 28x28
 
     Arguments:
-        images: Array of images with shape [batch_size, 
-            width * height * num_channels] 
+        images: Array of images with shape [batch_size,
+            width * height * num_channels]
         labels: Array of labels with shape [batch_size]
         width: Int, width of the images.
         height: Int, height of the images.
