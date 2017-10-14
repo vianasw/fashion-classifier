@@ -19,3 +19,9 @@ def get_hparams(hparams_arg):
     if hparams_arg:
         hparams.parse(hparams_arg)
     return hparams
+
+def shuffle_dataset(images, labels):
+    num_examples = images.shape[0]
+    permutation = list(np.random.permutation(num_examples))
+    return (images[permutation, :], labels[permutation, :])
+

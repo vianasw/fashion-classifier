@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from utils import load_dataset, get_hparams
+from utils import shuffle_dataset
 import argparse
 import tensorflow as tf
 import numpy as np
@@ -132,7 +133,7 @@ class FashionClassifier:
         accuracy = self._accuracy(eval_logits)
 
         num_examples = self.X_train.shape[0]
-        shuffled_X, shuffled_Y = self._shuffle_training_set()
+        shuffled_X, shuffled_Y = shuffle_dataset(self.X_train, self.Y_train)
 
         summ_op = tf.summary.merge_all()
 
@@ -328,11 +329,6 @@ class FashionClassifier:
         minibatch_Y = self.Y_train[offset:, :]
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
-
-    def _shuffle_training_set(self):
-        num_examples = self.X_train.shape[0]
-        permutation = list(np.random.permutation(num_examples))
-        return (self.X_train[permutation, :], self.Y_train[permutation, :])
 
     def _accuracy(self, logits):
         with tf.name_scope('accuracy'):
