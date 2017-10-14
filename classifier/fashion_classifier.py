@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, get_hparams
+from utils import load_dataset, get_hparams, augment_data
 from utils import shuffle_dataset
 import argparse
 import tensorflow as tf
@@ -368,6 +368,11 @@ def main(_):
     X_train, Y_train = dataset.train.images, dataset.train.labels
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
+    # Data augmentation: apply random horizontal flip to 30% of images
+    # and random crop to another 30% of images.
+    if FLAGS.augment_data:
+        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1, 0.3)
+
     if FLAGS.logdir:
         log_dir = FLAGS.logdir
     else:
@@ -401,8 +406,10 @@ if __name__ == '__main__':
     parser.add_argument('action', choices=['train', 'load'], default=None)
     parser.add_argument('--logdir', type=str, default=None,
                         help='Store log/model files.')
-    parser.add_argument('--resume_training',
+    parser.add_argument('--resume_training', action='store_true',
                         help='Resume training by loading last checkpoint')
+    parser.add_argument('--augment_data', action='store_true',
+                        help='Applies data augmentation to train dataset')
     parser.add_argument('--hparams', type=str, default=None,
                         help='Comma separated list of "name=value" pairs.')
 
