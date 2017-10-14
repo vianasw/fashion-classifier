@@ -34,7 +34,7 @@ def main(_):
             "conv2_depth": [64, 128],
             "dense_layer_units": [1024, 2048],
             "batch_size": [64, 128],
-            "keep_prob": [0.5],
+            "lambd": [0.5],
             "num_epochs": [5]
         }
 
@@ -51,7 +51,7 @@ def main(_):
         conv_depths = [hparams['conv1_depth'], hparams['conv2_depth']]
         dense_layer_units = hparams['dense_layer_units']
         batch_size = hparams['batch_size']
-        keep_prob = hparams['keep_prob']
+        lambd = hparams['lambd']
         num_epochs = hparams['num_epochs']
 
         log_dir = os.path.join(FLAGS.logdir, checkpoint_subdir)
@@ -63,7 +63,7 @@ def main(_):
         fashion_classifier.model(padding='SAME', patch_size=5,
                                 conv_depths=conv_depths, dense_layer_units=dense_layer_units,
                                 learning_rate=0.001, batch_size=batch_size,
-                                keep_prob=keep_prob)
+                                lambd=lambd)
 
         fashion_classifier.train_and_evaluate(num_epochs=num_epochs,
                                               resume_training=False,

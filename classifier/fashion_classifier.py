@@ -21,18 +21,18 @@ class FashionClassifier:
 
     The CNN Architecture is basically LeNet 5 slightly modified. Hidden units
     numbers may vary but baseline is as follows:
-            * Convolutional Layer #1: Applies 20 5x5 filters
+            * Convolutional Layer #1: Applies 5x5 filters
               (extracting 5x5-pixel subregions), with ReLU activation function
             * Pooling Layer #1: Performs max pooling with a 2x2 filter
               and stride of 2 (which specifies that pooled regions do not
               overlap)
-            * Convolutional Layer #2: Applies 50 5x5 filters, with ReLU
+            * Convolutional Layer #2: Applies 5x5 filters, with ReLU
               activation function
             * Pooling Layer #2: Again, performs max pooling with a 2x2 filter
               and stride of 2
-            * Dense Layer #1: 500 hidden units, with dropout regularization
+            * Dense Layer #1: Fully connected layer
             * Dense Layer #2 (Logits Layer): 10 hidden units, one for each
-              digit target class (0–9).
+              target class (0–9)
 
     Arguments:
         X_train: np array of training examples of shape [num_examples,
@@ -69,9 +69,10 @@ class FashionClassifier:
         self.writer = tf.summary.FileWriter(log_dir)
         self.log_dir = log_dir
         self.checkpoint_filename = checkpoint_filename
+        self.regularization = 0
 
     def model(self, padding, patch_size, conv_depths, dense_layer_units,
-              learning_rate, batch_size, keep_prob):
+              learning_rate, batch_size, lambd):
         """Defines the CNN model.
 
         Creates the computational graph for the CNN and set all hyperparameters
@@ -87,11 +88,11 @@ class FashionClassifier:
                 for learning rate decay.
             batch_size: Integer, size of the batch to process in each training
                 step.
-            keep_prob: Float, dropout keep probability (from 0.0 to 1.0) to
-                apply during training.
+            lambd: Float, L2 regularization parameter.
         """
 
         tf.reset_default_graph()
+        self.lambd = lambd
 
         self.padding = padding
         self.batch_size = batch_size
@@ -103,8 +104,7 @@ class FashionClassifier:
         # this is to display some image examples on Tensorboard
         tf.summary.image('input', self.X, 3)
 
-        self.logits = self._forward_propagation(
-                self.X, keep_prob, training=True)
+        self.logits = self._forward_propagation(self.X)
         self.cost = self._compute_cost(self.logits, self.Y)
 
         self.global_step = tf.Variable(
@@ -127,8 +127,7 @@ class FashionClassifier:
             print_cost: Boolean, if True, prints costs every some iterations.
         """
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
-                                                training=False)
+        eval_logits = self._forward_propagation(self.X)
         train_prediction = tf.nn.softmax(eval_logits)
         accuracy = self._accuracy(eval_logits)
 
@@ -187,11 +186,9 @@ class FashionClassifier:
             self._evaluate(eval_logits)
 
     def load_and_evaluate(self):
-        """Loads model from last checkpoint stored in log_dir.
-        """
+        """Loads model from last checkpoint stored in log_dir."""
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
-                                                training=False)
+        eval_logits = self._forward_propagation(self.X)
 
         with tf.Session() as session:
             session.run(init)
@@ -205,17 +202,12 @@ class FashionClassifier:
         Y = tf.placeholder(tf.float32, [None, self.num_classes], name='Y')
         return X, Y
 
-    def _forward_propagation(self, X, keep_prob=1.0, training=False):
+    def _forward_propagation(self, X):
         """Defines feed forward computation graph.
 
         Arguments:
             X: Input dataset placeholder, of shape (batch_size, image_size,
                 image_size, num_channels).
-            parameters: Dictionary containing the initialized weights and
-                biasses.
-            keep_prob: Float, dropout probability hyperparameter.
-            training: Boolean, used to apply dropout regularization during
-                training.
 
         Returns:
             fc2: The output of the last linear unit
@@ -238,9 +230,7 @@ class FashionClassifier:
                                           size_out=self.dense_layer_units,
                                           name='fc1')
 
-        fc1_dropout = self._dropout(fc1, keep_prob, training)
-
-        fc2 = self._fully_connected_layer(fc1_dropout,
+        fc2 = self._fully_connected_layer(fc1,
                                           size_in=self.dense_layer_units,
                                           size_out=self.num_classes,
                                           name='fc2')
@@ -257,6 +247,8 @@ class FashionClassifier:
             b = tf.get_variable(
                     'b', [size_out],
                     initializer=tf.zeros_initializer())
+
+            self.regularization += (self.lambd * tf.nn.l2_loss(W))
 
             conv = tf.nn.conv2d(
                     input, W, strides=[1, conv_stride, conv_stride, 1],
@@ -279,6 +271,8 @@ class FashionClassifier:
             b = tf.get_variable(
                     'b', [size_out], initializer=tf.zeros_initializer())
 
+            self.regularization += (self.lambd * tf.nn.l2_loss(W))
+
             act = tf.matmul(input, W) + b
 
             tf.summary.histogram("weights", W)
@@ -287,19 +281,10 @@ class FashionClassifier:
 
             return act
 
-    def _dropout(self, X, keep_prob, training=False, name='dropout'):
-        with tf.name_scope(name):
-            if training:
-                keep_prob = tf.constant(keep_prob)
-            else:
-                keep_prob = tf.constant(1.0)
-
-            return tf.nn.dropout(X, keep_prob)
-
     def _compute_cost(self, logits, labels):
         with tf.name_scope('xent'):
             cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits, labels=labels))
+                logits=logits, labels=labels) + self.regularization)
             tf.summary.scalar("cost", cost)
         return cost
 
@@ -389,7 +374,7 @@ def main(_):
                               dense_layer_units=hparams.dense_layer_units,
                               learning_rate=hparams.learning_rate,
                               batch_size=hparams.batch_size,
-                              keep_prob=hparams.keep_prob)
+                              lambd=hparams.lambd)
 
     if FLAGS.action == 'train':
         resume_training = True if FLAGS.resume_training else False
