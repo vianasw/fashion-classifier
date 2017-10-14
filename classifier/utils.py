@@ -20,6 +20,11 @@ def get_hparams(hparams_arg):
         hparams.parse(hparams_arg)
     return hparams
 
+def show_image(image, width, height):
+    plt.imshow(image.reshape([width, height]))
+    plt.gray()
+    plt.show()
+
 def augment_data(images, labels, width, height, num_channels, percent):
     """Augment dataset by applying rando horizontal flip and random crop to
     a percentage of images.
