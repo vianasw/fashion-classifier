@@ -368,22 +368,21 @@ def main(_):
     X_train, Y_train = dataset.train.images, dataset.train.labels
     X_test, Y_test = dataset.test.images, dataset.test.labels
 
-    # Data augmentation: apply random horizontal flip to 30% of images
-    # and random crop to another 30% of images.
-    if FLAGS.augment_data:
-        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1, 0.3)
-
     if FLAGS.logdir:
         log_dir = FLAGS.logdir
     else:
         log_dir = DEFAULT_LOGDIR
+
+    hparams = get_hparams(FLAGS.hparams)
+    # Data augmentation: apply random horizontal flip and random crop
+    if hparams.augment_percent > 0:
+        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1, hparams.augment_percent)
 
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test,
                                             image_size=28, num_channels=1,
                                             num_classes=10,
                                             log_dir=log_dir)
 
-    hparams = get_hparams(FLAGS.hparams)
     fashion_classiffier.model(padding='SAME', patch_size=5,
                               conv_depths=[hparams.conv1_depth, hparams.conv2_depth],
                               dense_layer_units=hparams.dense_layer_units,
@@ -408,8 +407,6 @@ if __name__ == '__main__':
                         help='Store log/model files.')
     parser.add_argument('--resume_training', action='store_true',
                         help='Resume training by loading last checkpoint')
-    parser.add_argument('--augment_data', action='store_true',
-                        help='Applies data augmentation to train dataset')
     parser.add_argument('--hparams', type=str, default=None,
                         help='Comma separated list of "name=value" pairs.')
 
