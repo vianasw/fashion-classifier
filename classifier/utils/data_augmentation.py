@@ -1,43 +1,9 @@
 #!/usr/bin/python3
 
-from tensorflow.examples.tutorials.mnist import input_data
+from utils.misc_utils import shuffle_dataset
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
 
-DATASET_PATH = 'data/fashion'
-IMAGE_SIZE = 28
-
-def load_dataset():
-    """Loads fashion dataset
-
-    Returns:
-        Datasets object
-    """
-    data = input_data.read_data_sets(DATASET_PATH, one_hot=True)
-    return data
-
-def get_hparams(hparams_str):
-    """Parses hparams_str to HParams object.
-
-    Arguments:
-        hparams_str: String of comma separated param=value pairs.
-
-    Returns:
-        hparams: tf.contrib.training.HParams object from hparams_str. If
-            hparams_str is None, then a default HParams object is returned.
-    """
-    hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32, conv2_depth=128,
-                                          dense_layer_units=1024, batch_size=128,
-                                          keep_prob=0.5, num_epochs=1, augment_percent=0.0)
-    if hparams_str:
-        hparams.parse(hparams_str)
-    return hparams
-
-def show_image(image, width, height):
-    plt.imshow(image.reshape([width, height]))
-    plt.gray()
-    plt.show()
 
 def augment_data(images, labels, width, height, num_channels, percent):
     """Augment dataset by applying rando horizontal flip and random crop to
@@ -116,20 +82,14 @@ def random_crop(images, labels, width, height, num_channels, percent):
     images_shuffled, labels_shuffled = shuffle_dataset(images, labels)
     images_reshaped = images_shuffled.reshape([-1, width, height, num_channels])
     slice_size = int(percent * images.shape[0])
-    boxes = np.repeat(np.array(
-                               [[4./(height-1),
+    boxes = np.repeat(np.array([[4./(height-1),
                                  4./(width-1),
                                  24./(height-1),
                                  24./(width-1)]]),
                       slice_size, axis=0)
-    cropped = tf.image.crop_and_resize(images_reshaped, boxes, np.arange(slice_size), [width, height])
+    cropped = tf.image.crop_and_resize(images_reshaped, boxes,
+                                       np.arange(slice_size), [width, height])
     cropped = tf.reshape(cropped, [-1, width * height * num_channels])
     with tf.Session() as session:
         return cropped.eval(), labels_shuffled[:slice_size, :]
-
-
-def shuffle_dataset(images, labels):
-    num_examples = images.shape[0]
-    permutation = list(np.random.permutation(num_examples))
-    return (images[permutation, :], labels[permutation, :])
 

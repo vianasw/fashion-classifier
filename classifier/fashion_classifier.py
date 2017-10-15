@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, get_hparams, augment_data
-from utils import shuffle_dataset
+from utils.misc_utils import load_dataset, get_hparams, shuffle_dataset
+from utils.data_augmentation import augment_data
 import argparse
 import tensorflow as tf
 import numpy as np
@@ -21,21 +21,21 @@ class FashionClassifier:
 
     The CNN Architecture is basically LeNet 5 slightly modified. Hidden units
     numbers may vary but baseline is as follows:
-            * Convolutional Layer #1: Applies 20 5x5 filters
+            * Convolutional Layer #1: Applies 5x5 filters
               (extracting 5x5-pixel subregions), with ReLU activation function
             * Pooling Layer #1: Performs max pooling with a 2x2 filter
               and stride of 2 (which specifies that pooled regions do not
               overlap)
-            * Convolutional Layer #2: Applies 50 5x5 filters, with ReLU
+            * Convolutional Layer #2: Applies 5x5 filters, with ReLU
               activation function
             * Pooling Layer #2: Again, performs max pooling with a 2x2 filter
               and stride of 2
-            * Dense Layer #1: 500 hidden units, with dropout regularization
+            * Dense Layer #1: Hidden units, with dropout regularization
             * Dense Layer #2 (Logits Layer): 10 hidden units, one for each
-              digit target class (0–9).
+              target class
 
     Arguments:
-        X_train: np array of training examples of shape [num_examples,
+        X_train: numpy array of training examples of shape [num_examples,
             image_size * image_size]
         Y_train: np array of training labels of shape [num_examples, 1]
         X_test: np array of test examples of shape [num_examples,
@@ -47,6 +47,7 @@ class FashionClassifier:
             greyscale, 3 for RGB).
         num_classes: Integer, number of classes to predict.
         log_dir: Path to save logs for Tensorboard and checkpoint files
+        checkpoint_filename: name of the checkpoint file, default: model.ckpt
     """
     def __init__(self, X_train, Y_train, X_test, Y_test, image_size,
                  num_channels, num_classes, log_dir,
