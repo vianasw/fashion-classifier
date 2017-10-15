@@ -8,9 +8,9 @@ import numpy as np
 import os
 import sys
 
-
 FLAGS = None
 DEFAULT_LOGDIR = '/tmp/fashion-classifier/logdir/'
+
 
 class FashionClassifier:
     """Classifier for the Fashion-MNIST Zalando's dataset [1].
@@ -128,7 +128,7 @@ class FashionClassifier:
             print_cost: Boolean, if True, prints costs every some iterations.
         """
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0,
                                                 training=False)
         train_prediction = tf.nn.softmax(eval_logits)
         accuracy = self._accuracy(eval_logits)
@@ -173,7 +173,8 @@ class FashionClassifier:
 
                 # Handling the end case (last mini-batch < batch_size)
                 if num_examples % num_minibatches != 0:
-                    (minibatch_X, minibatch_Y) = self._last_batch(num_minibatches)
+                    (minibatch_X, minibatch_Y) = self._last_batch(
+                                                    num_minibatches)
                     _, minibatch_cost, predictions = session.run(
                             [self.optimizer, self.cost, train_prediction],
                             feed_dict={self.X: minibatch_X,
@@ -188,10 +189,9 @@ class FashionClassifier:
             self._evaluate(eval_logits)
 
     def load_and_evaluate(self):
-        """Loads model from last checkpoint stored in log_dir.
-        """
+        """Loads model from last checkpoint stored in log_dir."""
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X, keep_prob=1.0, 
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0,
                                                 training=False)
 
         with tf.Session() as session:
@@ -364,6 +364,7 @@ class FashionClassifier:
         ckpt = tf.train.get_checkpoint_state(self.log_dir)
         saver.restore(session, ckpt.model_checkpoint_path)
 
+
 def main(_):
     dataset = load_dataset()
     X_train, Y_train = dataset.train.images, dataset.train.labels
@@ -377,24 +378,26 @@ def main(_):
     hparams = get_hparams(FLAGS.hparams)
     # Data augmentation: apply random horizontal flip and random crop
     if hparams.augment_percent > 0:
-        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1, hparams.augment_percent)
+        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1,
+                                        hparams.augment_percent)
 
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test,
                                             image_size=28, num_channels=1,
                                             num_classes=10,
                                             log_dir=log_dir)
 
+    conv_depths = [hparams.conv1_depth, hparams.conv2_depth]
     fashion_classiffier.model(padding='SAME', patch_size=5,
-                              conv_depths=[hparams.conv1_depth, hparams.conv2_depth],
+                              conv_depths=conv_depths,
                               dense_layer_units=hparams.dense_layer_units,
                               learning_rate=hparams.learning_rate,
                               batch_size=hparams.batch_size,
                               keep_prob=hparams.keep_prob)
 
     if FLAGS.action == 'train':
-        resume_training = True if FLAGS.resume_training else False
+        resume_training = FLAGS.resume_training is True
         fashion_classiffier.train_and_evaluate(num_epochs=hparams.num_epochs,
-                                               resume_training=FLAGS.resume_training,
+                                               resume_training=resume_training,
                                                print_cost=True)
     else:
         fashion_classiffier.load_and_evaluate()
