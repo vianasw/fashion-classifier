@@ -18,9 +18,9 @@ I've done three main modifications to the original LeNet-5:
 To fine tune the model and explore the hyperparameters space, I've implemented a few helper functions in `hparams_search.py` to perform random grid search following a coarse to fine approach.
 
 `hparams_search.py` usage:
-* --logdir path to dir where log/model files will be stored.
-* --hparams_path path to json file that specifies the values of the hyperparameters to train.
-* --grid_size indicates the number of hyperparameter combinations to test from all the possible combinations.
+* `--logdir` path to dir where log/model files will be stored.
+* `--hparams_path` path to json file that specifies the values of the hyperparameters to train.
+* `--grid_size` indicates the number of hyperparameter combinations to test from all the possible combinations.
 
 ```
 $ python hparams_search.py --logdir /tmp/fashion-classifier/coarse/ --hparams_path coarse.json --grid_size 10
