@@ -11,8 +11,8 @@ I've done three main modifications to the original LeNet-5:
 * The depths of the convolutional layers.
 * The humber of hidden units of the fully connected layer.
 
-![](doc/img/cnn-architecture.png)
-<img src="doc/img/cnn-architecture.png">
+![](doc/img/cnn_architecture.png)
+<img src="doc/img/cnn_architecture.png">
 
 ## Hyperparameters search
 
@@ -42,16 +42,19 @@ The grid of hyperparameters to explore are specified in a json file with the nam
 
 A cartesian product is applied to every hyperparameter list of values to generate all possible combinations. The list of all possible combinations is randomized and the `--grid_size` argument limits the number of combinations to try.
 
+By launching Tensorboard with the same `--logdir` argument as `hparams_search.py`, you can visualize the train accuracy, cross entropy cost,and the data distribution of weights and biases as the model gets trained. It's very usefull to debug and compare the performance of the model with different hyperparameters.
+
+
 ## Data augmentation
 To reduce overfitting I've implemented two methods to synthetically generate more examples:
 
 * Random horizontal flip.
 * Random crop with resize.
 
-However, the LeNet model architecture was probably too shallow to absorb those new examples and it didn't help much to reduce overfitting.
+However, the LeNet model architecture was probably too shallow to absorb those new examples and it didn't help much with overfitting.
 
 ## Visualizations
 
 ## Results
 
-## Conclusion
+## Conclusions
