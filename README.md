@@ -1,6 +1,6 @@
 # Fashion-Classifier
 
-`Fashion-Classifier` is a proof-of-concept classifier for [Fashion-MNIST Zalando's dataset](https://github.com/zalandoresearch/fashion-mnist), to test some deep learning techiniques as well as some technologies such as Tensorflow and Tensorboard. I'm using Zalando's dataset instead of the classic [MNIST dataset](http://yann.lecun.com/exdb/mnist/) because there are already so many MNIST Tensorflow tutorials out there and because it was a lot more challenging than MNIST.
+`Fashion-Classifier` is a proof-of-concept classifier for [Fashion-MNIST Zalando's dataset](https://github.com/zalandoresearch/fashion-mnist). I've done this mainly to test some deep learning techiniques as well as some technologies such as Tensorflow and Tensorboard. I'm using Zalando's dataset instead of the classic [MNIST dataset](http://yann.lecun.com/exdb/mnist/) because there are already so many MNIST Tensorflow tutorials out there and because it was a lot more challenging than MNIST.
 
 ## Architecture
 I decided to start with a slightly modified [LeNet-5](http://yann.lecun.com/exdb/lenet/) architecture. It is a very simple and well known convolutional neural network architecture that is easy to implement and usually gives good results out of the box to start with. 
