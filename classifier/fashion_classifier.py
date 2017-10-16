@@ -235,9 +235,12 @@ class FashionClassifier:
         shape = conv2.get_shape().as_list()
         fc1_size_in = shape[1] * shape[2] * shape[3]
         flattened = tf.reshape(conv2, [-1, fc1_size_in])
-        fc1 = self._fully_connected_layer(flattened, size_in=fc1_size_in,
-                                          size_out=self.dense_layer_units,
-                                          name='fc1')
+        fc1 = tf.nn.relu(
+                self._fully_connected_layer(flattened, size_in=fc1_size_in,
+                                            size_out=self.dense_layer_units,
+                                            name='fc1')
+                )
+
 
         fc1_dropout = self._dropout(fc1, keep_prob, training)
 
@@ -280,13 +283,13 @@ class FashionClassifier:
             b = tf.get_variable(
                     'b', [size_out], initializer=tf.zeros_initializer())
 
-            act = tf.matmul(input, W) + b
+            z = tf.matmul(input, W) + b
 
             tf.summary.histogram("weights", W)
             tf.summary.histogram("biases", b)
-            tf.summary.histogram("activations", act)
+            tf.summary.histogram("activations", z)
 
-            return act
+            return z
 
     def _dropout(self, X, keep_prob, training=False, name='dropout'):
         with tf.name_scope(name):
