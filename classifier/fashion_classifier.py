@@ -1,16 +1,19 @@
 #!/usr/bin/python3
 
-from utils import load_dataset, get_hparams, augment_data
-from utils import shuffle_dataset
+from utils.misc_utils import load_dataset, get_hparams, shuffle_dataset
+from utils.data_augmentation import augment_data
+from utils.visualization import create_sprite_image, invert_grayscale
+from tensorflow.contrib.tensorboard.plugins import projector
 import argparse
 import tensorflow as tf
 import numpy as np
 import os
 import sys
 
-
 FLAGS = None
 DEFAULT_LOGDIR = '/tmp/fashion-classifier/logdir/'
+EMBEDDING_SIZE = 1024
+
 
 class FashionClassifier:
     """Classifier for the Fashion-MNIST Zalando's dataset [1].
@@ -35,7 +38,7 @@ class FashionClassifier:
               target class (0–9)
 
     Arguments:
-        X_train: np array of training examples of shape [num_examples,
+        X_train: numpy array of training examples of shape [num_examples,
             image_size * image_size]
         Y_train: np array of training labels of shape [num_examples, 1]
         X_test: np array of test examples of shape [num_examples,
@@ -47,6 +50,7 @@ class FashionClassifier:
             greyscale, 3 for RGB).
         num_classes: Integer, number of classes to predict.
         log_dir: Path to save logs for Tensorboard and checkpoint files
+        checkpoint_filename: name of the checkpoint file, default: model.ckpt
     """
     def __init__(self, X_train, Y_train, X_test, Y_test, image_size,
                  num_channels, num_classes, log_dir,
@@ -72,7 +76,7 @@ class FashionClassifier:
         self.regularization = 0
 
     def model(self, padding, patch_size, conv_depths, dense_layer_units,
-              learning_rate, batch_size, lambd):
+              learning_rate, batch_size, keep_prob, lambd):
         """Defines the CNN model.
 
         Creates the computational graph for the CNN and set all hyperparameters
@@ -101,10 +105,13 @@ class FashionClassifier:
         self.dense_layer_units = dense_layer_units
 
         self.X, self.Y = self._create_placeholders()
+        self.embedding_placeholder = tf.placeholder(tf.float32, shape=[None, 784], name="embedding_x")
         # this is to display some image examples on Tensorboard
         tf.summary.image('input', self.X, 3)
 
-        self.logits = self._forward_propagation(self.X)
+        self.logits = self._forward_propagation(self.X, keep_prob,
+                                                training=True)
+
         self.cost = self._compute_cost(self.logits, self.Y)
 
         self.global_step = tf.Variable(
@@ -116,8 +123,9 @@ class FashionClassifier:
             self.optimizer = tf.train.AdamOptimizer(learning_rate).minimize(
                     self.cost, global_step=self.global_step)
 
+
     def train_and_evaluate(self, num_epochs, resume_training=False,
-                           print_cost=False):
+                           print_cost=False, create_embeddings=False):
         """Performs training for the CNN defined with the model method.
 
         Arguments:
@@ -127,7 +135,8 @@ class FashionClassifier:
             print_cost: Boolean, if True, prints costs every some iterations.
         """
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X)
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0,
+                                                training=False)
         train_prediction = tf.nn.softmax(eval_logits)
         accuracy = self._accuracy(eval_logits)
 
@@ -135,6 +144,10 @@ class FashionClassifier:
         shuffled_X, shuffled_Y = shuffle_dataset(self.X_train, self.Y_train)
 
         summ_op = tf.summary.merge_all()
+
+        embedding_assign = None
+        if create_embeddings:
+            embedding_assign = self._create_embeddings()
 
         with tf.Session() as session:
             session.run(init)
@@ -166,12 +179,13 @@ class FashionClassifier:
                             num_minibatches, minibatch_X, minibatch_Y, epoch,
                             step, print_cost)
 
-                    self._save_checkpoint(session, saver, step)
+                    self._save_checkpoint(session, saver, step, embedding_assign)
                 current_step = 0
 
                 # Handling the end case (last mini-batch < batch_size)
                 if num_examples % num_minibatches != 0:
-                    (minibatch_X, minibatch_Y) = self._last_batch(num_minibatches)
+                    (minibatch_X, minibatch_Y) = self._last_batch(
+                                                    num_minibatches)
                     _, minibatch_cost, predictions = session.run(
                             [self.optimizer, self.cost, train_prediction],
                             feed_dict={self.X: minibatch_X,
@@ -188,7 +202,8 @@ class FashionClassifier:
     def load_and_evaluate(self):
         """Loads model from last checkpoint stored in log_dir."""
         init = tf.global_variables_initializer()
-        eval_logits = self._forward_propagation(self.X)
+        eval_logits = self._forward_propagation(self.X, keep_prob=1.0,
+                                                training=False)
 
         with tf.Session() as session:
             session.run(init)
@@ -202,7 +217,7 @@ class FashionClassifier:
         Y = tf.placeholder(tf.float32, [None, self.num_classes], name='Y')
         return X, Y
 
-    def _forward_propagation(self, X):
+    def _forward_propagation(self, X, keep_prob, training=False):
         """Defines feed forward computation graph.
 
         Arguments:
@@ -226,11 +241,17 @@ class FashionClassifier:
         shape = conv2.get_shape().as_list()
         fc1_size_in = shape[1] * shape[2] * shape[3]
         flattened = tf.reshape(conv2, [-1, fc1_size_in])
-        fc1 = self._fully_connected_layer(flattened, size_in=fc1_size_in,
-                                          size_out=self.dense_layer_units,
-                                          name='fc1')
+        fc1 = tf.nn.relu(
+                self._fully_connected_layer(flattened, size_in=fc1_size_in,
+                                            size_out=self.dense_layer_units,
+                                            name='fc1')
+                )
 
-        fc2 = self._fully_connected_layer(fc1,
+        self.embedding_input = fc1
+
+        fc1_dropout = self._dropout(fc1, keep_prob, training)
+
+        fc2 = self._fully_connected_layer(fc1_dropout,
                                           size_in=self.dense_layer_units,
                                           size_out=self.num_classes,
                                           name='fc2')
@@ -272,14 +293,21 @@ class FashionClassifier:
                     'b', [size_out], initializer=tf.zeros_initializer())
 
             self.regularization += (self.lambd * tf.nn.l2_loss(W))
-
-            act = tf.matmul(input, W) + b
+            z = tf.matmul(input, W) + b
 
             tf.summary.histogram("weights", W)
             tf.summary.histogram("biases", b)
-            tf.summary.histogram("activations", act)
+            tf.summary.histogram("activations", z)
 
-            return act
+            return z
+
+    def _dropout(self, X, keep_prob, training=False, name='dropout'):
+        with tf.name_scope(name):
+            if training:
+                keep_prob = tf.constant(keep_prob)
+            else:
+                keep_prob = tf.constant(1.0)
+            return tf.nn.dropout(X, keep_prob)
 
     def _compute_cost(self, logits, labels):
         with tf.name_scope('xent'):
@@ -315,6 +343,44 @@ class FashionClassifier:
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
 
+    def _create_embeddings(self):
+        metadata_path = os.path.join(self.log_dir, 'metadata.tsv')
+        image_path = os.path.join(self.log_dir, 'sprite.png')
+        self._create_labels_if_not_exists(metadata_path)
+        self._create_sprite_if_not_exists(image_path)
+
+        embedding = tf.Variable(
+                tf.zeros([self.dense_layer_units, EMBEDDING_SIZE]),
+                name='embedding')
+
+        emb_assign = embedding.assign(self.embedding_input)
+        config = projector.ProjectorConfig()
+        embedding_config = config.embeddings.add()
+        embedding_config.tensor_name = embedding.name
+        embedding_config.metadata_path = metadata_path
+        embedding_config.sprite.image_path = image_path
+        embedding_config.sprite.single_image_dim.extend(
+                [self.image_size, self.image_size])
+        projector.visualize_embeddings(self.writer, config)
+        return emb_assign
+
+    def _create_sprite_if_not_exists(self, save_path):
+        if not os.path.exists(save_path):
+            X_embedding = self.X_test[:EMBEDDING_SIZE]
+            embedding_imgs = X_embedding.reshape(
+                [-1, self.image_size, self.image_size])
+            embedding_imgs = invert_grayscale(embedding_imgs)
+            create_sprite_image(embedding_imgs, save_path)
+
+    def _create_labels_if_not_exists(self, save_path):
+        if not os.path.exists(save_path):
+            Y_embedding = self.Y_test[:EMBEDDING_SIZE]
+            with open(save_path, 'w') as f:
+                f.write("Index\tLabel\n")
+                for index, one_hot_label in enumerate(Y_embedding):
+                    label = np.argmax(one_hot_label)
+                    f.write("%d\t%d\n" % (index,label))
+
     def _accuracy(self, logits):
         with tf.name_scope('accuracy'):
             correct_prediction = tf.equal(tf.argmax(logits, 1),
@@ -335,9 +401,15 @@ class FashionClassifier:
                 print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
                 print("Minibatch accuracy: %.1f%%" % (batch_accuracy * 100))
 
-    def _save_checkpoint(self, session, saver, step):
+    def _save_checkpoint(self, session, saver, step, embedding_assign):
         session.run(tf.assign(self.current_step, step))
-        if step % 50 == 0:
+        if step % 200 == 0:
+            if embedding_assign is not None:
+                batch_x = self._reformat(self.X_test[:EMBEDDING_SIZE])
+                session.run(embedding_assign,
+                            feed_dict={self.X: batch_x,
+                                       self.Y: self.Y_test[:EMBEDDING_SIZE]})
+
             checkpoint_path = os.path.join(self.log_dir,
                                            self.checkpoint_filename)
 
@@ -348,39 +420,43 @@ class FashionClassifier:
         ckpt = tf.train.get_checkpoint_state(self.log_dir)
         saver.restore(session, ckpt.model_checkpoint_path)
 
+
 def main(_):
     dataset = load_dataset()
     X_train, Y_train = dataset.train.images, dataset.train.labels
     X_test, Y_test = dataset.test.images, dataset.test.labels
-
-    # Data augmentation: apply random horizontal flip to 30% of images
-    # and random crop to another 30% of images.
-    if FLAGS.augment_data:
-        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1, 0.3)
 
     if FLAGS.logdir:
         log_dir = FLAGS.logdir
     else:
         log_dir = DEFAULT_LOGDIR
 
+    hparams = get_hparams(FLAGS.hparams)
+    # Data augmentation: apply random horizontal flip and random crop
+    if hparams.augment_percent > 0:
+        X_train, Y_train = augment_data(X_train, Y_train, 28, 28, 1,
+                                        hparams.augment_percent)
+
     fashion_classiffier = FashionClassifier(X_train, Y_train, X_test, Y_test,
                                             image_size=28, num_channels=1,
                                             num_classes=10,
                                             log_dir=log_dir)
 
-    hparams = get_hparams(FLAGS.hparams)
+    conv_depths = [hparams.conv1_depth, hparams.conv2_depth]
     fashion_classiffier.model(padding='SAME', patch_size=5,
-                              conv_depths=[hparams.conv1_depth, hparams.conv2_depth],
+                              conv_depths=conv_depths,
                               dense_layer_units=hparams.dense_layer_units,
                               learning_rate=hparams.learning_rate,
                               batch_size=hparams.batch_size,
+                              keep_prob=hparams.keep_prob,
                               lambd=hparams.lambd)
 
     if FLAGS.action == 'train':
-        resume_training = True if FLAGS.resume_training else False
+        resume_training = FLAGS.resume_training is True
         fashion_classiffier.train_and_evaluate(num_epochs=hparams.num_epochs,
-                                               resume_training=FLAGS.resume_training,
-                                               print_cost=True)
+                                               resume_training=resume_training,
+                                               print_cost=True,
+                                               create_embeddings=True)
     else:
         fashion_classiffier.load_and_evaluate()
 
@@ -393,8 +469,6 @@ if __name__ == '__main__':
                         help='Store log/model files.')
     parser.add_argument('--resume_training', action='store_true',
                         help='Resume training by loading last checkpoint')
-    parser.add_argument('--augment_data', action='store_true',
-                        help='Applies data augmentation to train dataset')
     parser.add_argument('--hparams', type=str, default=None,
                         help='Comma separated list of "name=value" pairs.')
 

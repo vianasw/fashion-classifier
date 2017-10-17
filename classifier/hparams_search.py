@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils import load_dataset
+from utils.misc_utils import load_dataset
 from itertools import product
 from random import shuffle
 from fashion_classifier import FashionClassifier
@@ -53,6 +53,7 @@ def main(_):
         batch_size = hparams['batch_size']
         lambd = hparams['lambd']
         num_epochs = hparams['num_epochs']
+        keep_prob = hparams['keep_prob']
 
         log_dir = os.path.join(FLAGS.logdir, checkpoint_subdir)
         fashion_classifier = FashionClassifier(X_train, Y_train, X_test, Y_test,
@@ -63,6 +64,7 @@ def main(_):
         fashion_classifier.model(padding='SAME', patch_size=5,
                                 conv_depths=conv_depths, dense_layer_units=dense_layer_units,
                                 learning_rate=0.001, batch_size=batch_size,
+                                keep_prob=keep_prob,
                                 lambd=lambd)
 
         fashion_classifier.train_and_evaluate(num_epochs=num_epochs,
