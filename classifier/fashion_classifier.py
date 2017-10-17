@@ -12,7 +12,6 @@ import sys
 
 FLAGS = None
 DEFAULT_LOGDIR = '/tmp/fashion-classifier/logdir/'
-EMBEDDING_SIZE = 1024
 
 
 class FashionClassifier:
@@ -125,7 +124,7 @@ class FashionClassifier:
 
 
     def train_and_evaluate(self, num_epochs, resume_training=False,
-                           print_cost=False, create_embeddings=False):
+                           print_cost=False, embedding_size=0):
         """Performs training for the CNN defined with the model method.
 
         Arguments:
@@ -146,8 +145,10 @@ class FashionClassifier:
         summ_op = tf.summary.merge_all()
 
         embedding_assign = None
-        if create_embeddings:
-            embedding_assign = self._create_embeddings()
+        if embedding_size > 0:
+            assert embedding_size == self.dense_layer_units, \
+                "Embedding size should be equals dense layer units."
+            embedding_assign = self._create_embeddings(embedding_size)
 
         with tf.Session() as session:
             session.run(init)
@@ -179,7 +180,8 @@ class FashionClassifier:
                             num_minibatches, minibatch_X, minibatch_Y, epoch,
                             step, print_cost)
 
-                    self._save_checkpoint(session, saver, step, embedding_assign)
+                    self._save_checkpoint(session, saver, step,
+                                          embedding_assign, embedding_size)
                 current_step = 0
 
                 # Handling the end case (last mini-batch < batch_size)
@@ -343,14 +345,14 @@ class FashionClassifier:
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
 
-    def _create_embeddings(self):
+    def _create_embeddings(self, embedding_size):
         metadata_path = os.path.join(self.log_dir, 'metadata.tsv')
         image_path = os.path.join(self.log_dir, 'sprite.png')
-        self._create_labels_if_not_exists(metadata_path)
-        self._create_sprite_if_not_exists(image_path)
+        self._create_labels_if_not_exists(metadata_path, embedding_size)
+        self._create_sprite_if_not_exists(image_path, embedding_size)
 
         embedding = tf.Variable(
-                tf.zeros([self.dense_layer_units, EMBEDDING_SIZE]),
+                tf.zeros([self.dense_layer_units, embedding_size]),
                 name='embedding')
 
         emb_assign = embedding.assign(self.embedding_input)
@@ -364,17 +366,17 @@ class FashionClassifier:
         projector.visualize_embeddings(self.writer, config)
         return emb_assign
 
-    def _create_sprite_if_not_exists(self, save_path):
+    def _create_sprite_if_not_exists(self, save_path, embedding_size):
         if not os.path.exists(save_path):
-            X_embedding = self.X_test[:EMBEDDING_SIZE]
+            X_embedding = self.X_test[:embedding_size]
             embedding_imgs = X_embedding.reshape(
                 [-1, self.image_size, self.image_size])
             embedding_imgs = invert_grayscale(embedding_imgs)
             create_sprite_image(embedding_imgs, save_path)
 
-    def _create_labels_if_not_exists(self, save_path):
+    def _create_labels_if_not_exists(self, save_path, embedding_size):
         if not os.path.exists(save_path):
-            Y_embedding = self.Y_test[:EMBEDDING_SIZE]
+            Y_embedding = self.Y_test[:embedding_size]
             with open(save_path, 'w') as f:
                 f.write("Index\tLabel\n")
                 for index, one_hot_label in enumerate(Y_embedding):
@@ -401,14 +403,15 @@ class FashionClassifier:
                 print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
                 print("Minibatch accuracy: %.1f%%" % (batch_accuracy * 100))
 
-    def _save_checkpoint(self, session, saver, step, embedding_assign):
+    def _save_checkpoint(self, session, saver, step, embedding_assign,
+                         embedding_size):
         session.run(tf.assign(self.current_step, step))
         if step % 200 == 0:
             if embedding_assign is not None:
-                batch_x = self._reformat(self.X_test[:EMBEDDING_SIZE])
+                batch_x = self._reformat(self.X_test[:embedding_size])
                 session.run(embedding_assign,
                             feed_dict={self.X: batch_x,
-                                       self.Y: self.Y_test[:EMBEDDING_SIZE]})
+                                       self.Y: self.Y_test[:embedding_size]})
 
             checkpoint_path = os.path.join(self.log_dir,
                                            self.checkpoint_filename)
@@ -453,10 +456,11 @@ def main(_):
 
     if FLAGS.action == 'train':
         resume_training = FLAGS.resume_training is True
+        embedding_size = FLAGS.embedding_size
         fashion_classiffier.train_and_evaluate(num_epochs=hparams.num_epochs,
                                                resume_training=resume_training,
                                                print_cost=True,
-                                               create_embeddings=True)
+                                               embedding_size=embedding_size)
     else:
         fashion_classiffier.load_and_evaluate()
 
@@ -471,6 +475,8 @@ if __name__ == '__main__':
                         help='Resume training by loading last checkpoint')
     parser.add_argument('--hparams', type=str, default=None,
                         help='Comma separated list of "name=value" pairs.')
+    parser.add_argument('--embedding_size', type=int, default=0,
+                        help='Number of images to use for embedding')
 
     FLAGS, _ = parser.parse_known_args()
 
