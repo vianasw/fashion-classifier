@@ -28,7 +28,7 @@ def get_hparams(hparams_str):
     """
     hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32, conv2_depth=128,
                                           dense_layer_units=1024, batch_size=128,
-                                          keep_prob=0.5, lambd=0.01, num_epochs=1, augment_percent=0.0)
+                                          keep_prob=0.5, lambd=0.0, num_epochs=1, augment_percent=0.0)
     if hparams_str:
         hparams.parse(hparams_str)
     return hparams
