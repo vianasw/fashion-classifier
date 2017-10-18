@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils.misc_utils import load_dataset
+from utils.dataset import load_dataset
 from itertools import product
 from random import shuffle
 from fashion_classifier import FashionClassifier

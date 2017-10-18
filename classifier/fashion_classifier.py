@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils.misc_utils import load_dataset, shuffle_dataset
+from utils.dataset import load_dataset, shuffle_dataset
 from utils.data_augmentation import augment_data
 from utils.visualization import create_sprite_image, invert_grayscale
 from tensorflow.contrib.tensorboard.plugins import projector

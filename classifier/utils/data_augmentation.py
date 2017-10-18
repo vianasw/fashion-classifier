@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils.misc_utils import shuffle_dataset
+from utils.dataset import shuffle_dataset
 import tensorflow as tf
 import numpy as np
 
