@@ -42,7 +42,7 @@ The grid of hyperparameters to explore are specified in a json file with the nam
 
 A cartesian product is applied to every hyperparameter list of values to generate all possible combinations. The list of all possible combinations is randomized and the `--grid_size` argument limits the number of combinations to try.
 
-By launching Tensorboard with the same `--logdir` argument as `hparams_search.py`, you can visualize the train accuracy, cross entropy cost,and the data distribution of weights and biases as the model gets trained. It's very usefull to debug and compare the performance of the model with different hyperparameters.
+By launching Tensorboard with the same `--logdir` argument as `hparams_search.py`, you can visualize the training accuracy, cross entropy cost,and the data distribution of weights and biases as the model gets trained. It's very useful to debug and compare the performance of the model with different hyperparameters.
 
 ![](doc/img/Tensorboard.png)
 
@@ -55,7 +55,7 @@ To reduce overfitting I've implemented two methods to synthetically generate mor
 The percentage of the total examples to apply these transformations is controlled by the hyperparameter `augment_percent`, i.e. `augment_percent=0.1` means 10% random horizontal flips and 10% random crops with resize, thus 20% more images.
 
 ## Visualizations
-Apart from the accuracy and cost graphs I've also included histograms and embeddings which allows the following visualizations in Tensorboard:
+In addition to the accuracy and cost graphs I've also included histograms and embeddings which allows the following visualizations in Tensorboard:
 
 * Distributions
 * Histograms
@@ -108,4 +108,4 @@ The test accuracy is definitely not state-of-the-art and could be easily improve
 ## Conclusions
 It was relativelly easy to train a model that at least could learn the train dataset well (avoidable bias reduction). The resulting model was clearly overfitting the train dataset and not generalizing well enough. However, reducing the overfitting was a much more challenging problem. Dropout regularization and data augmentation helped a bit, but probably LeNet-5 was not the ideal architecture for this concrete dataset. Some of the dataset classes were very similar to each other (e.g. ankle boots and sneakers, dresses and coats), so a slightly more sophisticated and deeper model like [AlexNet](http://vision.stanford.edu/teaching/cs231b_spring1415/slides/alexnet_tugce_kyunghee.pdf) would probably perform better.
 
-Training the model on a Macbook with no GPU acceleration was far from ideal too, and in the future I will definitely invest some time to setup an easy way to run these experiments on AWS spot instances or in Google Cloud. Either way, if you are using a Macbook and still want to run these experiments or similar ones, I definitely recommend that you compile Tensorflow from source, as it will enable some CPU optimizations that are not enabled in the binary package and that make a big difference.
+Training the model on a Macbook with no GPU acceleration was far from ideal too, and in the future I will definitely invest some time to setup an easy way to run these experiments on AWS spot instances or in Google Cloud. Either way, if you are using a Macbook and still want to run these experiments or similar ones, I definitely recommend that you compile Tensorflow from source, as it will enable some CPU optimizations that are not enabled in the binary package and which makes a big difference.
