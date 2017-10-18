@@ -38,7 +38,9 @@ def augment_data(images, labels, width, height, num_channels, percent):
     permutation = list(np.random.permutation(num_examples))
     return images[permutation, :], labels[permutation, :]
 
-def random_flip_left_right(images, labels, width, height, num_channels, percent):
+
+def random_flip_left_right(images, labels, width, height, num_channels,
+                           percent):
     """Randomly flips images horizontally.
 
     Arguments:
@@ -56,11 +58,14 @@ def random_flip_left_right(images, labels, width, height, num_channels, percent)
     """
     images_shuffled, labels_shuffled = shuffle_dataset(images, labels)
 
-    images_reshaped = images_shuffled.reshape([-1, width, height, num_channels])
+    images_reshaped = images_shuffled.reshape(
+            [-1, width, height, num_channels])
     slice_size = int(percent * images.shape[0])
     flipped = np.fliplr(images_reshaped[:slice_size, :, :, :].T)
     flipped = flipped.T
-    return flipped.reshape([-1, width * height * num_channels]), labels_shuffled[:slice_size, :]
+    flipped = flipped.reshape([-1, width * height * num_channels])
+    return flipped, labels_shuffled[:slice_size, :]
+
 
 def random_crop(images, labels, width, height, num_channels, percent):
     """Randomly crops images with a 20x20 bounding box and resize them to 28x28
@@ -80,7 +85,8 @@ def random_crop(images, labels, width, height, num_channels, percent):
     """
 
     images_shuffled, labels_shuffled = shuffle_dataset(images, labels)
-    images_reshaped = images_shuffled.reshape([-1, width, height, num_channels])
+    images_reshaped = images_shuffled.reshape(
+            [-1, width, height, num_channels])
     slice_size = int(percent * images.shape[0])
     boxes = np.repeat(np.array([[4./(height-1),
                                  4./(width-1),
@@ -92,4 +98,3 @@ def random_crop(images, labels, width, height, num_channels, percent):
     cropped = tf.reshape(cropped, [-1, width * height * num_channels])
     with tf.Session() as session:
         return cropped.eval(), labels_shuffled[:slice_size, :]
-
