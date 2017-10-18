@@ -73,7 +73,7 @@ Once you've found a good set of hyperparameters, you can use `fashion_classifier
 ```
 $ python fashion_classifier.py train \
 --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 \
---logdir /tmp/fashion-classifier/ --embedding_size 1024
+--logdir /tmp/fashion-classifier/ --create_embeddings
 ```
 
 Model checkpoints are saved in the `--logdir` path. This allows you to resume training if you stopped the execution or if you want to train the model longer by increasing the `num_epochs` hyperparameter. To resume training, use the same `--logdir` path and add the argument `--resume_training`. 
@@ -81,7 +81,7 @@ Model checkpoints are saved in the `--logdir` path. This allows you to resume tr
 ```
 $ python fashion_classifier.py train \
 --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 \
---logdir /tmp/fashion-classifier/ --embedding_size 1024 --resume_training
+--logdir /tmp/fashion-classifier/ --create_embeddings --resume_training
 ```
 
 It's also possible to load and evaluate a previously trained model with the following command:
