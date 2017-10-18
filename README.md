@@ -23,7 +23,8 @@ To fine tune the model and explore the hyperparameters space, I've implemented a
 * `--grid_size` indicates the number of hyperparameter combinations to test from all the possible combinations.
 
 ```
-$ python hparams_search.py --logdir /tmp/fashion-classifier/coarse/ --hparams_path coarse.json --grid_size 10
+$ python hparams_search.py --logdir /tmp/fashion-classifier/coarse/ \
+  --hparams_path coarse.json --grid_size 10
 ```
 
 The grid of hyperparameters to explore are specified in a json file with the name of each hyperparameter and a list of possible values. For example:
@@ -70,33 +71,41 @@ t-SNE visualizations, apart from being a nice visualization to include in a READ
 Once you've found a good set of hyperparameters, you can use `fashion_classifier.py` to train and evaluate your model:
 
 ```
-$ python fashion_classifier.py train --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 --logdir /tmp/fashion-classifier/ --embedding_size 1024
+$ python fashion_classifier.py train \
+--hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 \
+--logdir /tmp/fashion-classifier/ --embedding_size 1024
 ```
 
 Model checkpoints are saved in the `--logdir` path. This allows you to resume training if you stopped the execution or if you want to train the model longer by increasing the `num_epochs` hyperparameter. To resume training, use the same `--logdir` path and add the argument `--resume_training`. 
 
 ```
-$ python fashion_classifier.py train --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 --logdir /tmp/fashion-classifier/ --embedding_size 1024 --resume_training
+$ python fashion_classifier.py train \
+--hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1,num_epochs=5 \
+--logdir /tmp/fashion-classifier/ --embedding_size 1024 --resume_training
 ```
 
 It's also possible to load and evaluate a previously trained model with the following command:
 
 ```
-$ python fashion_classifier.py load --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1 --logdir /tmp/fashion-classifier/
+$ python fashion_classifier.py load \
+--hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.1 \
+--logdir /tmp/fashion-classifier/
 ```
 
 It's important to note that when resuming training or loading a model, you can't modify the network architecture (i.e. conv1_depth, conv2_depth and dense_layer_units must be the same as specified in the original training).
 
 ## Results
-Since I've being training the model in my Macbook with no GPU acceleration, I haven't been able to explore a big enough set of hyperparameters, as each iteration cycle could be in the order of hours. That said, I was able to achieve 98.11% accuracy in the train dataset and 92.26% in the test dataset training the model for 20 epochs with the following hyperparameters:
+Since I've being training the model in my Macbook with no GPU acceleration, I haven't been able to explore a big enough set of hyperparameters, as each iteration cycle could be in the order of hours. That said, I was able to achieve _98.11%_ accuracy in the train dataset and _92.26%_ in the test dataset training the model for 20 epochs with the following hyperparameters:
 
 ```
-$ python fashion_classifier.py train --hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,lambd=0.0,augment_percent=0.3,num_epochs=20 --logdir /tmp/fashion-classifier/logdir/conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,lambd=0.0,agument_percent=0.3
+$ python fashion_classifier.py train \
+--hparams conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.3,num_epochs=20 \
+--logdir /tmp/fc/logdir/conv1_depth=32,conv2_depth=64,dense_layer_units=1024,batch_size=128,keep_prob=0.6,augment_percent=0.3
 ```
 
-The test accuracy is definitely not state-of-the-art and could be easily improved a bit with the same CNN architecture, but with just more computation resources to fine tune the hyperparameters and train the model longer.
+The test accuracy is definitely not state-of-the-art and could be easily improved a bit with the same CNN architecture, but using more computation resources to fine tune the model and train it longer.
 
 ## Conclusions
-It was relativelly easy to train a model that at least could learn the train dataset well (avoidable bias reduction). The resulting model was clearly overfitting the train dataset and not generalizing well enough. However, reducing the overfitting was a much more challenging problem. Dropout regularization and data augmentation helped a bit, but probably LeNet-5 was not the ideal architecture for this concrete dataset. Some of the dataset classes were very similar to each other (e.g. ankle boots and sneakers, dresses and coats), so a slightly more sophisticated and deeper model like (AlexNet)[http://vision.stanford.edu/teaching/cs231b_spring1415/slides/alexnet_tugce_kyunghee.pdf] would probably perform better.
+It was relativelly easy to train a model that at least could learn the train dataset well (avoidable bias reduction). The resulting model was clearly overfitting the train dataset and not generalizing well enough. However, reducing the overfitting was a much more challenging problem. Dropout regularization and data augmentation helped a bit, but probably LeNet-5 was not the ideal architecture for this concrete dataset. Some of the dataset classes were very similar to each other (e.g. ankle boots and sneakers, dresses and coats), so a slightly more sophisticated and deeper model like [AlexNet](http://vision.stanford.edu/teaching/cs231b_spring1415/slides/alexnet_tugce_kyunghee.pdf) would probably perform better.
 
 Training the model on a Macbook with no GPU acceleration was far from ideal too, and in the future I will definitely invest some time to setup an easy way to run these experiments on AWS spot instances or in Google Cloud. Either way, if you are using a Macbook and still want to run these experiments or similar ones, I definitely recommend that you compile Tensorflow from source, as it will enable some CPU optimizations that are not enabled in the binary package and that make a big difference.
