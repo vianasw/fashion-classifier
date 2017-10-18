@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from utils.misc_utils import load_dataset, get_hparams, shuffle_dataset
+from utils.misc_utils import load_dataset, shuffle_dataset
 from utils.data_augmentation import augment_data
 from utils.visualization import create_sprite_image, invert_grayscale
 from tensorflow.contrib.tensorboard.plugins import projector
@@ -463,6 +463,23 @@ def main(_):
                                                embedding_size=embedding_size)
     else:
         fashion_classiffier.load_and_evaluate()
+
+def get_hparams(hparams_str):
+    """Parses hparams_str to HParams object.
+
+    Arguments:
+        hparams_str: String of comma separated param=value pairs.
+
+    Returns:
+        hparams: tf.contrib.training.HParams object from hparams_str. If
+            hparams_str is None, then a default HParams object is returned.
+    """
+    hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32, conv2_depth=128,
+                                          dense_layer_units=1024, batch_size=128,
+                                          keep_prob=0.5, lambd=0.0, num_epochs=1, augment_percent=0.0)
+    if hparams_str:
+        hparams.parse(hparams_str)
+    return hparams
 
 
 if __name__ == '__main__':
