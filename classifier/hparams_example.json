@@ -1,0 +1,9 @@
+{
+    "conv1_depth": [16, 32, 64],
+    "conv2_depth": [32, 64, 128],
+    "dense_layer_units": [512, 1024, 2048],
+    "batch_size": [64, 128, 256, 512],
+    "keep_prob": [1.0],
+    "lambd": [0.0],
+    "num_epochs": [4]
+} 
