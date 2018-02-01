@@ -50,16 +50,16 @@ class FashionClassifier:
         self.batch_size = batch_size
 
         self.embedding_placeholder = tf.placeholder(
-                tf.float32, shape=[None, self.model.image_size * self.model.image_size],
-                name="embedding_x")
+            tf.float32, shape=[None, self.model.image_size * self.model.image_size],
+            name="embedding_x")
 
         # this is to display some image examples on Tensorboard
         tf.summary.image('input', self.model.X(), 3)
 
         self.global_step = tf.Variable(
-                0, dtype=tf.int32, trainable=False, name='global_step')
+            0, dtype=tf.int32, trainable=False, name='global_step')
         self.current_step = tf.Variable(
-                0, dtype=tf.int32, trainable=False, name='current_step')
+            0, dtype=tf.int32, trainable=False, name='current_step')
 
     def train_and_evaluate(self, num_epochs, resume_training=False,
                            print_cost=False, create_embeddings=False):
@@ -105,16 +105,15 @@ class FashionClassifier:
                     (minibatch_X, minibatch_Y) = self._next_batch(step)
 
                     _, minibatch_cost, predictions = session.run(
-                            [optimizer, self.model.cost, train_prediction],
-                            feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y)
-                        )
+                        [optimizer, self.model.cost, train_prediction],
+                        feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
 
                     epoch_cost += minibatch_cost / num_minibatches
 
                     self._log_progress(
-                            session, summ_op, accuracy, minibatch_cost,
-                            num_minibatches, minibatch_X, minibatch_Y, epoch,
-                            step, print_cost)
+                        session, summ_op, accuracy, minibatch_cost,
+                        num_minibatches, minibatch_X, minibatch_Y, epoch,
+                        step, print_cost)
 
                     self._save_checkpoint(session, saver, step,
                                           embedding_assign)
@@ -122,12 +121,10 @@ class FashionClassifier:
 
                 # Handling the end case (last mini-batch < batch_size)
                 if num_examples % num_minibatches != 0:
-                    (minibatch_X, minibatch_Y) = self._last_batch(
-                                                    num_minibatches)
+                    (minibatch_X, minibatch_Y) = self._last_batch(num_minibatches)
                     _, minibatch_cost, predictions = session.run(
-                            [optimizer, self.model.cost, train_prediction],
-                            feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y)
-                        )
+                        [optimizer, self.model.cost, train_prediction],
+                        feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
 
                     epoch_cost += minibatch_cost / num_minibatches
 
@@ -182,8 +179,8 @@ class FashionClassifier:
         self._create_sprite_if_not_exists(image_path)
 
         embedding = tf.Variable(
-                tf.zeros([self.dense_layer_units, self.dense_layer_units]),
-                name='embedding')
+            tf.zeros([self.dense_layer_units, self.dense_layer_units]),
+            name='embedding')
 
         emb_assign = embedding.assign(self.embedding_input)
         config = projector.ProjectorConfig()
@@ -191,8 +188,7 @@ class FashionClassifier:
         embedding_config.tensor_name = embedding.name
         embedding_config.metadata_path = metadata_path
         embedding_config.sprite.image_path = image_path
-        embedding_config.sprite.single_image_dim.extend(
-                [self.image_size, self.image_size])
+        embedding_config.sprite.single_image_dim.extend([self.image_size, self.image_size])
         projector.visualize_embeddings(self.writer, config)
         return emb_assign
 
@@ -211,7 +207,7 @@ class FashionClassifier:
                 f.write("Index\tLabel\n")
                 for index, one_hot_label in enumerate(Y_embedding):
                     label = np.argmax(one_hot_label)
-                    f.write("%d\t%d\n" % (index,label))
+                    f.write("%d\t%d\n" % (index, label))
 
     def _log_progress(self, session, summ, accuracy, minibatch_cost,
                       num_minibatches, minibatch_X, minibatch_Y, epoch, step,
@@ -255,12 +251,11 @@ def main(_):
     hparams = get_hparams(FLAGS.hparams)
     # Data augmentation: apply random horizontal flip and random crop
     if hparams.augment_percent > 0:
-        images, labels = augment_data(train_dataset.X, train_dataset.Y, 28, 28, 1,
-                                        hparams.augment_percent)
+        images, labels = augment_data(train_dataset.X, train_dataset.Y, 28, 28, 1, hparams.augment_percent)
         train_dataset = DatasetPair(images, labels)
 
     model = LeNet(hparams, image_size=28, num_channels=1, num_classes=10)
-    fashion_classiffier = FashionClassifier(model, train_dataset, test_dataset, 
+    fashion_classiffier = FashionClassifier(model, train_dataset, test_dataset,
                                             batch_size=128, log_dir=log_dir)
     if FLAGS.action == 'train':
         resume_training = FLAGS.resume_training
@@ -282,10 +277,10 @@ def get_hparams(hparams_str):
         hparams: tf.contrib.training.HParams object from hparams_str. If
             hparams_str is None, then a default HParams object is returned.
     """
-    hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32, 
-                                          conv2_depth=128, dense_layer_units=1024, 
+    hparams = tf.contrib.training.HParams(learning_rate=0.001, conv1_depth=32,
+                                          conv2_depth=128, dense_layer_units=1024,
                                           batch_size=128, padding='SAME',
-                                          keep_prob=0.5, lambd=0.0, 
+                                          keep_prob=0.5, lambd=0.0,
                                           num_epochs=1, patch_size=5,
                                           augment_percent=0.0)
     if hparams_str:

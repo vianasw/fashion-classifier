@@ -58,8 +58,7 @@ def random_flip_left_right(images, labels, width, height, num_channels,
     """
     images_shuffled, labels_shuffled = shuffle_dataset(images, labels)
 
-    images_reshaped = images_shuffled.reshape(
-            [-1, width, height, num_channels])
+    images_reshaped = images_shuffled.reshape([-1, width, height, num_channels])
     slice_size = int(percent * images.shape[0])
     flipped = np.fliplr(images_reshaped[:slice_size, :, :, :].T)
     flipped = flipped.T
@@ -85,8 +84,7 @@ def random_crop(images, labels, width, height, num_channels, percent):
     """
 
     images_shuffled, labels_shuffled = shuffle_dataset(images, labels)
-    images_reshaped = images_shuffled.reshape(
-            [-1, width, height, num_channels])
+    images_reshaped = images_shuffled.reshape([-1, width, height, num_channels])
     slice_size = int(percent * images.shape[0])
     boxes = np.repeat(np.array([[4./(height-1),
                                  4./(width-1),
@@ -96,5 +94,5 @@ def random_crop(images, labels, width, height, num_channels, percent):
     cropped = tf.image.crop_and_resize(images_reshaped, boxes,
                                        np.arange(slice_size), [width, height])
     cropped = tf.reshape(cropped, [-1, width * height * num_channels])
-    with tf.Session() as session:
+    with tf.Session():
         return cropped.eval(), labels_shuffled[:slice_size, :]

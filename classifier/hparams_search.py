@@ -57,19 +57,20 @@ def main(_):
 
         log_dir = os.path.join(FLAGS.logdir, checkpoint_subdir)
         fashion_classifier = FashionClassifier(X_train, Y_train, X_test, Y_test,
-                                                image_size=28, num_channels=1,
-                                                num_classes=10,
-                                                log_dir=log_dir)
+                                               image_size=28, num_channels=1,
+                                               num_classes=10,
+                                               log_dir=log_dir)
 
         fashion_classifier.model(padding='SAME', patch_size=5,
-                                conv_depths=conv_depths, dense_layer_units=dense_layer_units,
-                                learning_rate=0.001, batch_size=batch_size,
-                                keep_prob=keep_prob,
-                                lambd=lambd)
+                                 conv_depths=conv_depths, dense_layer_units=dense_layer_units,
+                                 learning_rate=0.001, batch_size=batch_size,
+                                 keep_prob=keep_prob,
+                                 lambd=lambd)
 
         fashion_classifier.train_and_evaluate(num_epochs=num_epochs,
                                               resume_training=False,
                                               print_cost=True)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

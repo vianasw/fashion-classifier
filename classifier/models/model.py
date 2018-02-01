@@ -57,8 +57,7 @@ class Model(ABC):
         """Returns feed dictionary to be used during training"""
         return {self.X(): X, self.Y(): Y}
 
-    def conv_layer(self, input, size_in, size_out, patch_size, conv_stride,
-                    name='conv'):
+    def conv_layer(self, input, size_in, size_out, patch_size, conv_stride, name='conv'):
         """Creates convolutional layer.
 
         Arguments:
@@ -72,23 +71,17 @@ class Model(ABC):
             Tensor
         """
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-            W = tf.get_variable(
-                    'W',
-                    [patch_size, patch_size, size_in, size_out],
-                    initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.get_variable(
-                    'b', [size_out],
-                    initializer=tf.zeros_initializer())
+            W = tf.get_variable('W', [patch_size, patch_size, size_in, size_out],
+                                initializer=tf.contrib.layers.xavier_initializer())
+            b = tf.get_variable('b', [size_out], initializer=tf.zeros_initializer())
 
             self.regularization += (self.hparams.lambd * tf.nn.l2_loss(W))
 
-            conv = tf.nn.conv2d(
-                    input, W, strides=[1, conv_stride, conv_stride, 1],
-                    padding=self.hparams.padding)
+            conv = tf.nn.conv2d(input, W, strides=[1, conv_stride, conv_stride, 1],
+                                padding=self.hparams.padding)
             act = tf.nn.relu(conv + b)
-            pool = tf.nn.max_pool(
-                    act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
-                    padding=self.hparams.padding)
+            pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                                  padding=self.hparams.padding)
 
             tf.summary.histogram("weights", W)
             tf.summary.histogram("biases", b)
@@ -107,11 +100,9 @@ class Model(ABC):
             Tensor
         """
         with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-            W = tf.get_variable(
-                    'W', [size_in, size_out],
-                    initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.get_variable(
-                    'b', [size_out], initializer=tf.zeros_initializer())
+            W = tf.get_variable('W', [size_in, size_out],
+                                initializer=tf.contrib.layers.xavier_initializer())
+            b = tf.get_variable('b', [size_out], initializer=tf.zeros_initializer())
 
             self.regularization += (self.hparams.lambd * tf.nn.l2_loss(W))
             z = tf.matmul(input, W) + b
@@ -140,4 +131,3 @@ class Model(ABC):
             else:
                 keep_prob = tf.constant(1.0)
             return tf.nn.dropout(input, keep_prob)
-

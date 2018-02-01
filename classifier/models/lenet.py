@@ -31,7 +31,7 @@ class LeNet(Model):
 
     """
     def __init__(self, hparams, image_size, num_channels, num_classes):
-        self.hparams = hparams 
+        self.hparams = hparams
         self.image_size = image_size
         self.num_channels = num_channels
         self.num_classes = num_classes
@@ -47,7 +47,7 @@ class LeNet(Model):
     def optimizer(self, global_step=None):
         with tf.name_scope('train'):
             optimizer = tf.train.AdamOptimizer(self.hparams.learning_rate).minimize(
-                    self.cost, global_step=global_step)
+                self.cost, global_step=global_step)
         return optimizer
 
     def forward_propagation(self, keep_prob, training=False):
@@ -62,32 +62,32 @@ class LeNet(Model):
         """
 
         conv1 = self.conv_layer(input=self._X, size_in=self.num_channels,
-                                 size_out=self.hparams.conv1_depth,
-                                 patch_size=self.hparams.patch_size, conv_stride=1,
-                                 name='conv1')
+                                size_out=self.hparams.conv1_depth,
+                                patch_size=self.hparams.patch_size, conv_stride=1,
+                                name='conv1')
 
         conv2 = self.conv_layer(input=conv1, size_in=self.hparams.conv1_depth,
-                                 size_out=self.hparams.conv2_depth,
-                                 patch_size=self.hparams.patch_size,
-                                 conv_stride=2, name='conv2')
+                                size_out=self.hparams.conv2_depth,
+                                patch_size=self.hparams.patch_size,
+                                conv_stride=2, name='conv2')
 
         shape = conv2.get_shape().as_list()
         fc1_size_in = shape[1] * shape[2] * shape[3]
         flattened = tf.reshape(conv2, [-1, fc1_size_in])
         fc1 = tf.nn.relu(
-                self.fully_connected_layer(flattened, size_in=fc1_size_in,
-                                            size_out=self.hparams.dense_layer_units,
-                                            name='fc1')
-                )
+            self.fully_connected_layer(flattened, size_in=fc1_size_in,
+                                       size_out=self.hparams.dense_layer_units,
+                                       name='fc1')
+        )
 
         self.embedding_input = fc1
 
         fc1_dropout = self.dropout(fc1, keep_prob, training)
 
         fc2 = self.fully_connected_layer(fc1_dropout,
-                                          size_in=self.hparams.dense_layer_units,
-                                          size_out=self.num_classes,
-                                          name='fc2')
+                                         size_in=self.hparams.dense_layer_units,
+                                         size_out=self.num_classes,
+                                         name='fc2')
 
         return fc2
 
@@ -110,5 +110,3 @@ class LeNet(Model):
                 logits=logits, labels=labels) + self.regularization)
             tf.summary.scalar("cost", self.cost)
         return self.cost
-
-    

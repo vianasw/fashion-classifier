@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 from tensorflow.examples.tutorials.mnist import input_data
-import tensorflow as tf
 import numpy as np
 
 DATASET_PATH = 'data/fashion'
