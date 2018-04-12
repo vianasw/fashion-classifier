@@ -57,15 +57,20 @@ class Model(ABC):
         """Returns feed dictionary to be used during training"""
         return {self.X(): X, self.Y(): Y}
 
-    def conv_layer(self, input, size_in, size_out, patch_size, conv_stride, name='conv'):
-        """Creates convolutional layer.
+    def conv_layer(self, input, size_in, size_out, patch_size, conv_stride, name='conv', num_convolutions=1):
+        """Creates convolutional layer with ReLU activation function and max pooling.
+
+        Layer operations:
+            * Convolution operation with patch_size x patch_size filters, and size_out of those
+            * ReLU activation function
+            * Max pooling with stride=2 and size=2x2
 
         Arguments:
             input: Tensor, placeholder tensor to apply convolution operation
             size_in: Integer, number of input neurons
             size_out: Integer, number of output neurons
             patch_size: Integer, size of the convolutional patch to apply
-            conv_stride: Integer, number of strides to apply
+            conv_stride: Integer, number of strides for convolution operation
             name: String, name used for variable_scope
         Returns:
             Tensor
@@ -80,12 +85,30 @@ class Model(ABC):
             conv = tf.nn.conv2d(input, W, strides=[1, conv_stride, conv_stride, 1],
                                 padding=self.hparams.padding)
             act = tf.nn.relu(conv + b)
-            pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
-                                  padding=self.hparams.padding)
 
             tf.summary.histogram("weights", W)
             tf.summary.histogram("biases", b)
             tf.summary.histogram("activations", act)
+
+            for i in range(1, num_convolutions):
+                W = tf.get_variable('W' + str(i), [patch_size, patch_size, size_out, size_out],
+                                    initializer=tf.contrib.layers.xavier_initializer())
+                b = tf.get_variable('b' + str(i), [size_out], initializer=tf.zeros_initializer())
+
+
+                self.regularization += (self.hparams.lambd * tf.nn.l2_loss(W))
+
+                conv = tf.nn.conv2d(act, W, strides=[1, conv_stride, conv_stride, 1],
+                                    padding=self.hparams.padding)
+
+                act = tf.nn.relu(conv + b)
+                tf.summary.histogram("weights", W)
+                tf.summary.histogram("biases", b)
+                tf.summary.histogram("activations", act)
+
+            pool = tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
+                                  padding=self.hparams.padding)
+
             return pool
 
     def fully_connected_layer(self, input, size_in, size_out, name='fc'):

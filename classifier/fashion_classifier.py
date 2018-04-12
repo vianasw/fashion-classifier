@@ -4,6 +4,7 @@ from utils.dataset import load_dataset, shuffle_dataset
 from utils.data_augmentation import augment_data
 from utils.visualization import create_sprite_image, invert_grayscale
 from models.lenet import LeNet
+from models.vgg import VGG
 from tensorflow.contrib.tensorboard.plugins import projector
 from collections import namedtuple
 import argparse
@@ -254,9 +255,9 @@ def main(_):
         images, labels = augment_data(train_dataset.X, train_dataset.Y, 28, 28, 1, hparams.augment_percent)
         train_dataset = DatasetPair(images, labels)
 
-    model = LeNet(hparams, image_size=28, num_channels=1, num_classes=10)
+    model = VGG(hparams, image_size=28, num_channels=1, num_classes=10)
     fashion_classiffier = FashionClassifier(model, train_dataset, test_dataset,
-                                            batch_size=128, log_dir=log_dir)
+                                            batch_size=hparams.batch_size, log_dir=log_dir)
     if FLAGS.action == 'train':
         resume_training = FLAGS.resume_training
         create_embeddings = FLAGS.create_embeddings

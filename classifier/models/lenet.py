@@ -69,7 +69,7 @@ class LeNet(Model):
         conv2 = self.conv_layer(input=conv1, size_in=self.hparams.conv1_depth,
                                 size_out=self.hparams.conv2_depth,
                                 patch_size=self.hparams.patch_size,
-                                conv_stride=2, name='conv2')
+                                conv_stride=1, name='conv2')
 
         shape = conv2.get_shape().as_list()
         fc1_size_in = shape[1] * shape[2] * shape[3]
