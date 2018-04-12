@@ -16,6 +16,8 @@ import sys
 FLAGS = None
 DEFAULT_LOGDIR = '/tmp/fashion-classifier/logdir/'
 
+models = {'lenet': LeNet, 'vgg': VGG}
+
 # Tuple containing numpy arrays for training examples and labels
 DatasetPair = namedtuple('DatasetPair', ['X', 'Y'])
 
@@ -255,7 +257,8 @@ def main(_):
         images, labels = augment_data(train_dataset.X, train_dataset.Y, 28, 28, 1, hparams.augment_percent)
         train_dataset = DatasetPair(images, labels)
 
-    model = VGG(hparams, image_size=28, num_channels=1, num_classes=10)
+    model_class = models[FLAGS.model]
+    model = model_class(hparams, image_size=28, num_channels=1, num_classes=10)
     fashion_classiffier = FashionClassifier(model, train_dataset, test_dataset,
                                             batch_size=hparams.batch_size, log_dir=log_dir)
     if FLAGS.action == 'train':
@@ -303,6 +306,9 @@ if __name__ == '__main__':
     parser.add_argument('--create_embeddings', action='store_true',
                         default=False,
                         help='Create embeddings during training.')
+    parser.add_argument('--model', default='vgg', const='vgg', nargs='?',
+                        choices=['lenet', 'vgg'],
+                        help='Model to use during training.')
 
     FLAGS, _ = parser.parse_known_args()
 
