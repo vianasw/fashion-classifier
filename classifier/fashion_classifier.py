@@ -89,7 +89,9 @@ class FashionClassifier:
             embedding_assign = self._create_embeddings()
 
         optimizer = self.model.optimizer(self.global_step)
+        tf_metric, tf_metric_update = tf.metrics.accuracy(labels=tf.argmax(self.model.Y(), 1), predictions=tf.argmax(logits, 1))
         init = tf.global_variables_initializer()
+        init_l = tf.local_variables_initializer()
         with tf.Session() as session:
             session.run(init)
             saver = tf.train.Saver()
@@ -105,7 +107,7 @@ class FashionClassifier:
             for epoch in range(current_epoch, num_epochs):
                 epoch_cost = 0
                 for step in range(current_step, num_minibatches):
-                    (minibatch_X, minibatch_Y) = self._next_batch(step)
+                    (minibatch_X, minibatch_Y) = self._next_batch(step, self.X_train, self.Y_train, self.batch_size)
 
                     _, minibatch_cost, predictions = session.run(
                         [optimizer, self.model.cost, train_prediction],
@@ -124,7 +126,7 @@ class FashionClassifier:
 
                 # Handling the end case (last mini-batch < batch_size)
                 if num_examples % num_minibatches != 0:
-                    (minibatch_X, minibatch_Y) = self._last_batch(num_minibatches)
+                    (minibatch_X, minibatch_Y) = self._last_batch(self.X_train, self.Y_train, self.batch_size, num_minibatches)
                     _, minibatch_cost, predictions = session.run(
                         [optimizer, self.model.cost, train_prediction],
                         feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
@@ -134,44 +136,59 @@ class FashionClassifier:
                 if print_cost:
                     print("Cost after epoch %i: %f" % (epoch, epoch_cost))
 
-            self._print_accuracy(logits)
+            self._print_accuracy(session, logits, tf_metric, tf_metric_update)
 
     def load_and_evaluate(self):
         """Loads model from last checkpoint stored in log_dir."""
-        init = tf.global_variables_initializer()
         eval_logits = self.model.logits()
 
+        tf_metric, tf_metric_update = tf.metrics.accuracy(labels=tf.argmax(self.model.Y(), 1), predictions=tf.argmax(eval_logits, 1))
+        init = tf.global_variables_initializer()
         with tf.Session() as session:
             session.run(init)
             saver = tf.train.Saver()
             self._restore_last_checkpoint(session, saver)
-            self._print_accuracy(eval_logits)
-
+            self._print_accuracy(session, eval_logits, tf_metric, tf_metric_update)
 
     def _reformat(self, dataset):
         return dataset.reshape([-1, self.model.image_size, self.model.image_size,
                                self.model.num_channels])
 
-    def _print_accuracy(self, logits):
-        with tf.name_scope('accuracy'):
-            accuracy = self.model.accuracy(logits)
-            print("Train Accuracy:", accuracy.eval(
-                self.model.feed_dict(self._reformat(self.X_train), self.Y_train)))
-            print("Test Accuracy:", accuracy.eval(
-                self.model.feed_dict(self._reformat(self.X_test), self.Y_test)))
+    def _print_accuracy(self, session, logits, tf_metric, tf_metric_update):
+        train_accuracy = self._compute_accuracy(session, logits, tf_metric, tf_metric_update,
+                self.X_train, self.Y_train)
+        print("Train accuracy: ", train_accuracy)
+        test_accuracy = self._compute_accuracy(session, logits, tf_metric, tf_metric_update,
+                self.X_test, self.Y_test)
+        print("Test accuracy: ", test_accuracy)
 
-    def _next_batch(self, step):
-        offset = (step * self.batch_size) % (self.X_train.shape[0] -
-                                             self.batch_size)
-        minibatch_X = self.X_train[offset:(offset + self.batch_size), :]
-        minibatch_Y = self.Y_train[offset:(offset + self.batch_size), :]
+    def _compute_accuracy(self, session, logits, tf_metric, tf_metric_update, X, Y):
+        num_examples = self.X_train.shape[0]
+        batch_size = min(1000, num_examples - 1)
+        num_minibatches = int(num_examples / batch_size)
+        session.run(tf.local_variables_initializer())
+        for step in range(num_minibatches):
+            (minibatch_X, minibatch_Y) = self._next_batch(step, X, Y, batch_size)
+            tf_metric_update.eval(self.model.feed_dict(minibatch_X, minibatch_Y))
+
+        if num_examples % num_minibatches != 0:
+            (minibatch_X, minibatch_Y) = self._last_batch(X, Y, batch_size, num_minibatches)
+            tf_metric_update.eval(self.model.feed_dict(minibatch_X, minibatch_Y))
+
+        accuracy = tf_metric.eval()
+        return accuracy
+
+    def _next_batch(self, step, X, Y, batch_size):
+        offset = (step * batch_size) % (X.shape[0] - batch_size)
+        minibatch_X = X[offset:(offset + batch_size), :]
+        minibatch_Y = Y[offset:(offset + batch_size), :]
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
 
-    def _last_batch(self, num_minibatches):
-        offset = num_minibatches * self.batch_size
-        minibatch_X = self.X_train[offset:, :]
-        minibatch_Y = self.Y_train[offset:, :]
+    def _last_batch(self, X, Y, batch_size, num_minibatches):
+        offset = num_minibatches * batch_size
+        minibatch_X = X[offset:, :]
+        minibatch_Y = Y[offset:, :]
         minibatch_X = self._reformat(minibatch_X)
         return minibatch_X, minibatch_Y
 
@@ -216,9 +233,8 @@ class FashionClassifier:
                       num_minibatches, minibatch_X, minibatch_Y, epoch, step,
                       print_cost):
         if step % 5 == 0:
-            [batch_accuracy, s] = session.run([accuracy, summ],
-                                              feed_dict=self.model.feed_dict(
-                                                  minibatch_X, minibatch_Y))
+            batch_accuracy, s = session.run([accuracy, summ], 
+                    feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
             self.writer.add_summary(s, (epoch * num_minibatches) + step)
             if print_cost and step % 50 == 0:
                 print("Minibatch loss at step %d: %f" % (step, minibatch_cost))
@@ -246,6 +262,7 @@ class FashionClassifier:
 
 def main(_):
     dataset = load_dataset()
+    #train_dataset = DatasetPair(dataset.train.images[:1000], dataset.train.labels[:1000])
     train_dataset = DatasetPair(dataset.train.images, dataset.train.labels)
     test_dataset = DatasetPair(dataset.test.images, dataset.test.labels)
 
