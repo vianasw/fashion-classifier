@@ -46,11 +46,19 @@ class VGG(Model):
 
         fc1_dropout = self.dropout(fc1, keep_prob, training)
 
-        fc2 = self.fully_connected_layer(fc1_dropout,
+        fc2 = tf.nn.relu(
+            self.fully_connected_layer(fc1_dropout, size_in=4096,
+                                       size_out=4096,
+                                       name='fc2')
+        )
+
+        fc2_dropout = self.dropout(fc2, keep_prob, training)
+
+        fc3 = self.fully_connected_layer(fc2_dropout,
                                          size_in=4096,
                                          size_out=self.num_classes,
-                                         name='fc2')
-        return fc2
+                                         name='fc3')
+        return fc3
 
     def _setup_model_params(self):
         tf.reset_default_graph()
