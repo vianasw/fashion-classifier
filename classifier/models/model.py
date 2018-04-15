@@ -34,9 +34,6 @@ class Model(ABC):
         """
         return self.forward_propagation(keep_prob=1.0, training=False)
 
-    def evaluate(self, X):
-        return tf.nn.softmax(self.logits(X))
-
     def accuracy(self, logits):
         """Calculates accuracy given logits
 

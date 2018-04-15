@@ -76,7 +76,6 @@ class FashionClassifier:
             create_embeddings: Boolean, if True will create embeddings visualization
         """
         logits = self.model.logits()
-        train_prediction = tf.nn.softmax(logits)
         accuracy = self.model.accuracy(logits)
 
         num_examples = self.X_train.shape[0]
@@ -91,7 +90,7 @@ class FashionClassifier:
         optimizer = self.model.optimizer(self.global_step)
         tf_metric, tf_metric_update = tf.metrics.accuracy(labels=tf.argmax(self.model.Y(), 1), predictions=tf.argmax(logits, 1))
         init = tf.global_variables_initializer()
-        init_l = tf.local_variables_initializer()
+
         with tf.Session() as session:
             session.run(init)
             saver = tf.train.Saver()
@@ -109,8 +108,8 @@ class FashionClassifier:
                 for step in range(current_step, num_minibatches):
                     (minibatch_X, minibatch_Y) = self._next_batch(step, self.X_train, self.Y_train, self.batch_size)
 
-                    _, minibatch_cost, predictions = session.run(
-                        [optimizer, self.model.cost, train_prediction],
+                    _, minibatch_cost = session.run(
+                        [optimizer, self.model.cost],
                         feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
 
                     epoch_cost += minibatch_cost / num_minibatches
@@ -127,8 +126,8 @@ class FashionClassifier:
                 # Handling the end case (last mini-batch < batch_size)
                 if num_examples % num_minibatches != 0:
                     (minibatch_X, minibatch_Y) = self._last_batch(self.X_train, self.Y_train, self.batch_size, num_minibatches)
-                    _, minibatch_cost, predictions = session.run(
-                        [optimizer, self.model.cost, train_prediction],
+                    _, minibatch_cost = session.run(
+                        [optimizer, self.model.cost],
                         feed_dict=self.model.feed_dict(minibatch_X, minibatch_Y))
 
                     epoch_cost += minibatch_cost / num_minibatches
@@ -262,7 +261,6 @@ class FashionClassifier:
 
 def main(_):
     dataset = load_dataset()
-    #train_dataset = DatasetPair(dataset.train.images[:1000], dataset.train.labels[:1000])
     train_dataset = DatasetPair(dataset.train.images, dataset.train.labels)
     test_dataset = DatasetPair(dataset.test.images, dataset.test.labels)
 
