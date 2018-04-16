@@ -28,7 +28,6 @@ class LeNet(Model):
         num_channels: Integer, number of channels of the image (1 for
             greyscale, 3 for RGB)
         num_classes: Integer, number of classes to predict
-
     """
     def __init__(self, hparams, image_size, num_channels, num_classes):
         self.hparams = hparams

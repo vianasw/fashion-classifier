@@ -92,7 +92,6 @@ class Model(ABC):
                                     initializer=tf.contrib.layers.xavier_initializer())
                 b = tf.get_variable('b' + str(i), [size_out], initializer=tf.zeros_initializer())
 
-
                 self.regularization += (self.hparams.lambd * tf.nn.l2_loss(W))
 
                 conv = tf.nn.conv2d(act, W, strides=[1, conv_stride, conv_stride, 1],

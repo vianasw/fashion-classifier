@@ -5,7 +5,34 @@ import tensorflow as tf
 
 
 class VGG(Model):
+    """CNN model for image classification
 
+    The CNN architecture is based on the VGG model architecture from [Simonyan
+    & Zisserman 2015. Very deep convolutional networks for large scale image
+    recognition]. The original model has many more layers, 16 with weights, as it
+    uses 224x224x3 images and this model is applied for images of size 28x28x3,
+    so here we have 9 layers with weightsin total. VGG is a simple network with
+    few hyperparameters and a focus on just having conv layers that are just 3x3
+    filters with stride = 1, always uses same padding, all max pooling 2x2 and
+    stride = 2. The details are as follows:
+            * Three convolutional layers with 3x3 filters with ReLU activation
+              function followed by...
+            * Max pooling with a 2x2 filter and stride of 2.
+            * Three more convolutional layers with 3x3 filters, with ReLU
+              activation function.
+            * Again, performs max pooling with a 2x2 filter and stride of 2.
+            * Dense Layer #1: Fully connected layer with 4096 neurons.
+            * Dense Layer #2: Fully connected layer with 4096 neurons.
+            * Dense Layer #3 (Logits Layer): 10 hidden units, one for each
+              target class (0–9).
+    Arguments:
+        hparams: tf.contrib.training.HParams, hyper parameters
+        image_size: Integer, specifies the width and height of the images from
+            the datasets
+        num_channels: Integer, number of channels of the image (1 for greyscale,,,,
+            3 for RGB)
+        num_classes: Integer, number of classes to predict
+    """
     def __init__(self, hparams, image_size, num_channels, num_classes):
         self.hparams = hparams
         self.image_size = image_size
